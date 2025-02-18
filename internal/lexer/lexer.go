@@ -10,13 +10,13 @@ type LexerError struct {
 	Message string
 }
 
-func NewUnexpectedError(unexpected byte) *LexerError {
+func newUnexpectedError(unexpected byte) *LexerError {
 	return &LexerError{
 		Message: fmt.Sprintf("unexpected character: '%s'", string(unexpected)),
 	}
 }
 
-func NewUnexpectedExpectedError(unexpected byte, expected byte) *LexerError {
+func newUnexpectedExpectedError(unexpected byte, expected byte) *LexerError {
 	return &LexerError{
 		Message: fmt.Sprintf(
 			"expected '%s', but got: '%s', instead",
@@ -25,7 +25,7 @@ func NewUnexpectedExpectedError(unexpected byte, expected byte) *LexerError {
 	}
 }
 
-func NewExpectedError(expected byte) *LexerError {
+func newExpectedError(expected byte) *LexerError {
 	return &LexerError{
 		Message: fmt.Sprintf("expected '%s'", string(expected)),
 	}
@@ -89,7 +89,7 @@ func (l *Lexer) Tokenize() []Token {
 			break
 
 		default:
-			l.eh.AddError(NewUnexpectedError(l.read()))
+			l.eh.AddError(newUnexpectedError(l.read()))
 			l.eh.FailNow()
 		}
 
@@ -323,12 +323,11 @@ func (l *Lexer) processStringLiteral() Token {
 	for l.hasChars() {
 		if l.read() == '"' {
 			foundClosingQuote = true
-			l.advance()
 			break
 		}
 
 		if l.read() == '\n' {
-			l.eh.AddError(NewExpectedError('"'))
+			l.eh.AddError(newExpectedError('"'))
 			l.eh.FailNow()
 		}
 
@@ -337,7 +336,7 @@ func (l *Lexer) processStringLiteral() Token {
 	}
 
 	if !foundClosingQuote {
-		l.eh.AddError(NewExpectedError('"'))
+		l.eh.AddError(newExpectedError('"'))
 		l.eh.FailNow()
 	}
 
@@ -352,19 +351,19 @@ func (l *Lexer) processCharLiteral() Token {
 
 	l.advance()
 	if !l.hasChars() {
-		l.eh.AddError(NewExpectedError('\''))
+		l.eh.AddError(newExpectedError('\''))
 		l.eh.FailNow()
 	}
 
 	if l.read() == '\n' {
-		l.eh.AddError(NewExpectedError('\''))
+		l.eh.AddError(newExpectedError('\''))
 		l.eh.FailNow()
 	}
 	char = l.read()
 
 	l.advance()
 	if !l.hasChars() || l.read() != '\'' {
-		l.eh.AddError(NewExpectedError('\''))
+		l.eh.AddError(newExpectedError('\''))
 		l.eh.FailNow()
 	}
 
