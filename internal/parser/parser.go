@@ -127,6 +127,13 @@ func (p *Parser) parseExpr() ast.Expr {
 
 func (p *Parser) parsePrimaryExpr() ast.Expr {
 	if p.curr.Kind == lexer.IDENT {
+		p.read()
+		if p.curr.Kind == lexer.LPAREN {
+			p.unread()
+			return p.parseCallExpr()
+		}
+
+		p.unread()
 		return p.parseIdentExpr()
 	}
 
@@ -154,6 +161,31 @@ func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
 			Op:    op,
 			Right: right,
 		}
+	}
+}
+
+func (p *Parser) parseCallExpr() ast.Expr {
+	p.expect(lexer.IDENT)
+	name := p.curr.Value
+	p.read()
+
+	p.expect(lexer.LPAREN)
+	p.read()
+
+	args := make([]ast.Expr, 0)
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.RPAREN {
+		args = append(args, p.parseExpr())
+		if p.curr.Kind == lexer.COMMA {
+			p.read()
+		}
+	}
+
+	p.expect(lexer.RPAREN)
+	p.read()
+
+	return &ast.CallExpr{
+		Name: name,
+		Args: args,
 	}
 }
 
@@ -257,8 +289,8 @@ func (p *Parser) read() lexer.Token {
 }
 
 func (p *Parser) unread() lexer.Token {
-	p.scanner.Unread()
-	return p.read()
+	p.curr = p.scanner.Unread()
+	return p.curr
 }
 
 func (p *Parser) expect(kind lexer.TokenKind) {
