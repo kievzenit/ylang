@@ -1,6 +1,7 @@
 package lexer
 
 type TokenScanner interface {
+	HasTokens() bool
 	Read() Token
 	Unread()
 }
@@ -15,6 +16,10 @@ func NewTokenScanner(tokens []Token) TokenScanner {
 	return &SimpleTokenScanner{
 		tokens: tokens,
 	}
+}
+
+func (s *SimpleTokenScanner) HasTokens() bool {
+	return s.pos < len(s.tokens)
 }
 
 func (s *SimpleTokenScanner) Read() Token {
