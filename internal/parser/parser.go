@@ -46,6 +46,14 @@ type Parser struct {
 	curr lexer.Token
 }
 
+var bindingPowerLookup map[lexer.TokenKind]int = map[lexer.TokenKind]int{
+	lexer.PLUS:     10,
+	lexer.MINUS:    10,
+	lexer.ASTERISK: 20,
+	lexer.SLASH:    20,
+	lexer.PERCENT:  20,
+}
+
 func NewParser(scanner lexer.TokenScanner, eh compiler_errors.ErrorHandler) *Parser {
 	return &Parser{
 		scanner: scanner,
@@ -113,7 +121,8 @@ func (p *Parser) parseExprStmt() ast.Stmt {
 }
 
 func (p *Parser) parseExpr() ast.Expr {
-	return p.parsePrimaryExpr()
+	left := p.parsePrimaryExpr()
+	return p.parseBinaryExpr(left, 0)
 }
 
 func (p *Parser) parsePrimaryExpr() ast.Expr {
@@ -124,8 +133,28 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 	return p.parseLiteralExpr()
 }
 
-func (p *Parser) parseBinaryExpr() ast.Expr {
-	return nil
+func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
+	for {
+		op := p.curr
+		currentBindingPower, ok := bindingPowerLookup[op.Kind]
+		if !ok || currentBindingPower < bindingPower {
+			return left
+		}
+		p.read()
+
+		right := p.parsePrimaryExpr()
+
+		nextBindingPower, ok := bindingPowerLookup[p.curr.Kind]
+		if !ok || currentBindingPower < nextBindingPower {
+			right = p.parseBinaryExpr(right, currentBindingPower+10)
+		}
+
+		left = &ast.BinaryExpr{
+			Left:  left,
+			Op:    op,
+			Right: right,
+		}
+	}
 }
 
 func (p *Parser) parseIdentExpr() ast.Expr {
