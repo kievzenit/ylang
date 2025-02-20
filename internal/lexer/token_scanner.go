@@ -3,7 +3,7 @@ package lexer
 type TokenScanner interface {
 	HasTokens() bool
 	Read() Token
-	Unread()
+	Unread() Token
 }
 
 type SimpleTokenScanner struct {
@@ -29,6 +29,7 @@ func (s *SimpleTokenScanner) Read() Token {
 	return token
 }
 
-func (s *SimpleTokenScanner) Unread() {
+func (s *SimpleTokenScanner) Unread() Token {
 	s.pos--
+	return s.tokens[s.pos-1]
 }
