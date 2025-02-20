@@ -483,7 +483,7 @@ func (l *Lexer) processPercent() Token {
 	l.advance()
 	if !l.hasChars() {
 		return Token{
-			Kind:  SLASH,
+			Kind:  PERCENT,
 			Value: "%",
 		}
 	}
@@ -681,7 +681,7 @@ func (l *Lexer) processPunctuation() Token {
 	case '/':
 		return l.processSlash()
 	case '%':
-		return l.processSlash()
+		return l.processPercent()
 	case '=':
 		return l.processEquals()
 	case '&':
