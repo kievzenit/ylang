@@ -62,13 +62,88 @@ func NewParser(scanner lexer.TokenScanner, eh compiler_errors.ErrorHandler) *Par
 	}
 }
 
-func (p *Parser) Parse() []ast.Stmt {
-	stmts := make([]ast.Stmt, 0)
+func (p *Parser) Parse() []ast.TopStmt {
+	stmts := make([]ast.TopStmt, 0)
 	for p.scanner.HasTokens() {
-		stmts = append(stmts, p.parseStmt())
+		stmts = append(stmts, p.parseTopSmt())
 	}
 
 	return stmts
+}
+
+func (p *Parser) parseTopSmt() ast.TopStmt {
+	switch p.curr.Kind {
+	case lexer.EXTERN:
+		p.read()
+		return p.parseFuncDeclStmt(true)
+	case lexer.FUN:
+		return p.parseFuncDeclStmt(false)
+	case lexer.STATIC:
+		p.read()
+		return p.parseVarDeclStmt(true)
+	case lexer.CONST:
+		return p.parseVarDeclStmt(false)
+	case lexer.LET:
+		return p.parseVarDeclStmt(false)
+	}
+
+	p.eh.AddError(&UnexpectedError{
+		Unexpected: p.curr.Kind,
+	})
+	p.eh.FailNow()
+	panic("unreachable")
+}
+
+func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
+	p.expect(lexer.FUN)
+	p.read()
+
+	p.expect(lexer.IDENT)
+	name := p.curr.Value
+	p.read()
+
+	p.expect(lexer.LPAREN)
+	p.read()
+
+	args := make([]ast.FuncArg, 0)
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.RPAREN {
+		p.expect(lexer.IDENT)
+		argName := p.curr.Value
+		p.read()
+
+		p.expect(lexer.COLON)
+		p.read()
+
+		p.expect(lexer.IDENT)
+		argType := p.curr.Value
+		p.read()
+
+		args = append(args, ast.FuncArg{
+			Name: argName,
+			Type: argType,
+		})
+
+		if p.curr.Kind == lexer.COMMA {
+			p.read()
+		}
+	}
+
+	p.expect(lexer.RPAREN)
+	p.read()
+
+	p.expect(lexer.IDENT)
+	returnType := p.curr.Value
+	p.read()
+
+	body := p.parseScopeStmt()
+
+	return &ast.FuncDeclStmt{
+		Name:  name,
+		ReturnType: returnType,
+		Args:  args,
+		Body:  body,
+		Extern: extern,
+	}
 }
 
 func (p *Parser) parseStmt() ast.Stmt {
@@ -85,7 +160,24 @@ func (p *Parser) parseStmt() ast.Stmt {
 	return p.parseExprStmt()
 }
 
-func (p *Parser) parseVarDeclStmt(static bool) ast.Stmt {
+func (p *Parser) parseScopeStmt() *ast.ScopeStmt {
+	p.expect(lexer.LBRACE)
+	p.read()
+
+	stmts := make([]ast.Stmt, 0)
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.RBRACE {
+		stmts = append(stmts, p.parseStmt())
+	}
+
+	p.expect(lexer.RBRACE)
+	p.read()
+
+	return &ast.ScopeStmt{
+		Stmts: stmts,
+	}
+}
+
+func (p *Parser) parseVarDeclStmt(static bool) *ast.VarDeclStmt {
 	p.expectAny(lexer.LET, lexer.CONST)
 	isConst := p.curr.Kind == lexer.CONST
 
