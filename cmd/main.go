@@ -6,10 +6,13 @@ import (
 
 	"github.com/kievzenit/ylang/internal/compiler_errors"
 	l "github.com/kievzenit/ylang/internal/lexer"
+	"github.com/kievzenit/ylang/internal/parser"
+	"github.com/sanity-io/litter"
 )
 
 func main() {
-	fileData, err := os.ReadFile("../sources/tokens.y")
+	fileName := os.Args[1]
+	fileData, err := os.ReadFile(fileName)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -22,7 +25,11 @@ func main() {
 	for _, token := range tokens {
 		fmt.Println(token.String())
 	}
-
 	scanner := l.NewTokenScanner(tokens)
-	_ = scanner
+
+	parser := parser.NewParser(scanner, eh)
+	stmts := parser.Parse()
+	for _, stmt := range stmts {
+		litter.Dump(stmt)
+	}
 }
