@@ -37,6 +37,8 @@ const (
 	BAND // &
 	BOR  // |
 	BXOR // ^
+	SHR  // >>
+	SHL  // <<
 
 	LAND // &&
 	LOR  // ||
@@ -137,6 +139,10 @@ func (tk TokenKind) String() string {
 		return "BOR"
 	case BXOR:
 		return "BXOR"
+	case SHR:
+		return "SHR"
+	case SHL:
+		return "SHL"
 	case LAND:
 		return "LAND"
 	case LOR:

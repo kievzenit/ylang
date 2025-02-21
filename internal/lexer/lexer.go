@@ -580,6 +580,13 @@ func (l *Lexer) processGreaterThan() Token {
 		}
 	}
 
+	if l.read() == '>' {
+		return Token{
+			Kind:  SHR,
+			Value: ">>",
+		}
+	}
+
 	if l.read() == '=' {
 		return Token{
 			Kind:  GEQ,
@@ -607,6 +614,13 @@ func (l *Lexer) processLessThan() Token {
 		return Token{
 			Kind:  LT,
 			Value: "<",
+		}
+	}
+
+	if l.read() == '<' {
+		return Token{
+			Kind:  SHL,
+			Value: "<<",
 		}
 	}
 

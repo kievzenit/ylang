@@ -55,6 +55,8 @@ var bindingPowerLookup map[lexer.TokenKind]int = map[lexer.TokenKind]int{
 	lexer.BAND:	 30,
 	lexer.BOR:	 30,
 	lexer.BXOR:	 30,
+	lexer.SHL:	 30,
+	lexer.SHR:	 30,
 	lexer.LT: 40,
 	lexer.LEQ: 40,
 	lexer.GT: 40,
