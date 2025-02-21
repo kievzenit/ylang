@@ -138,11 +138,11 @@ func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
 	body := p.parseScopeStmt()
 
 	return &ast.FuncDeclStmt{
-		Name:  name,
+		Name:       name,
 		ReturnType: returnType,
-		Args:  args,
-		Body:  body,
-		Extern: extern,
+		Args:       args,
+		Body:       body,
+		Extern:     extern,
 	}
 }
 
@@ -218,7 +218,10 @@ func (p *Parser) parseExpr() ast.Expr {
 }
 
 func (p *Parser) parsePrimaryExpr() ast.Expr {
-	if p.curr.Kind == lexer.IDENT {
+	switch p.curr.Kind {
+	case lexer.LPAREN:
+		return p.parseParenExpr()
+	case lexer.IDENT:
 		p.read()
 		if p.curr.Kind == lexer.LPAREN {
 			p.unread()
@@ -230,6 +233,18 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 	}
 
 	return p.parseLiteralExpr()
+}
+
+func (p *Parser) parseParenExpr() ast.Expr {
+	p.expect(lexer.LPAREN)
+	p.read()
+
+	expr := p.parseExpr()
+
+	p.expect(lexer.RPAREN)
+	p.read()
+
+	return expr
 }
 
 func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
