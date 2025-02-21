@@ -52,19 +52,19 @@ var bindingPowerLookup map[lexer.TokenKind]int = map[lexer.TokenKind]int{
 	lexer.ASTERISK: 20,
 	lexer.SLASH:    20,
 	lexer.PERCENT:  20,
-	lexer.BAND:	 30,
-	lexer.BOR:	 30,
-	lexer.BXOR:	 30,
-	lexer.SHL:	 30,
-	lexer.SHR:	 30,
-	lexer.LT: 40,
-	lexer.LEQ: 40,
-	lexer.GT: 40,
-	lexer.GEQ: 40,
-	lexer.EQ: 50,
-	lexer.NEQ: 50,
-	lexer.LAND: 60,
-	lexer.LOR: 60,
+	lexer.BAND:     30,
+	lexer.BOR:      30,
+	lexer.BXOR:     30,
+	lexer.SHL:      30,
+	lexer.SHR:      30,
+	lexer.LT:       40,
+	lexer.LEQ:      40,
+	lexer.GT:       40,
+	lexer.GEQ:      40,
+	lexer.EQ:       50,
+	lexer.NEQ:      50,
+	lexer.LAND:     60,
+	lexer.LOR:      60,
 }
 
 func NewParser(scanner lexer.TokenScanner, eh compiler_errors.ErrorHandler) *Parser {
@@ -159,9 +159,9 @@ func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
 
 func (p *Parser) parseStmt() ast.Stmt {
 	switch p.curr.Kind {
-	case lexer.IF:
+	case lexer.IF, lexer.DO, lexer.WHILE, lexer.LOOP:
 		return p.parseControlStmt()
-	case lexer.RETURN:
+	case lexer.RETURN, lexer.CONTINUE, lexer.BREAK, lexer.BREAKALL:
 		return p.parseJumpStmt()
 	case lexer.STATIC, lexer.CONST, lexer.LET:
 		return p.parseLocalStmt()
@@ -180,6 +180,12 @@ func (p *Parser) parseControlStmt() ast.Stmt {
 	switch p.curr.Kind {
 	case lexer.IF:
 		return p.parseIfStmt()
+	case lexer.DO:
+		return p.parseDoWhileStmt()
+	case lexer.WHILE:
+		return p.parseWhileStmt()
+	case lexer.LOOP:
+		return p.parseLoopStmt()
 	}
 
 	p.eh.AddError(&UnexpectedError{
@@ -193,6 +199,12 @@ func (p *Parser) parseJumpStmt() ast.Stmt {
 	switch p.curr.Kind {
 	case lexer.RETURN:
 		return p.parseReturnStmt()
+	case lexer.CONTINUE:
+		return p.parseContinueStmt()
+	case lexer.BREAK:
+		return p.parseBreakStmt()
+	case lexer.BREAKALL:
+		return p.parseBreakAllStmt()
 	}
 
 	p.eh.AddError(&UnexpectedError{
@@ -232,6 +244,36 @@ func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
 	return &ast.ReturnStmt{
 		Expr: expr,
 	}
+}
+
+func (p *Parser) parseContinueStmt() *ast.ContinueStmt {
+	p.expect(lexer.CONTINUE)
+	p.read()
+
+	p.expect(lexer.SEMICOLON)
+	p.read()
+
+	return &ast.ContinueStmt{}
+}
+
+func (p *Parser) parseBreakStmt() *ast.BreakStmt {
+	p.expect(lexer.BREAK)
+	p.read()
+
+	p.expect(lexer.SEMICOLON)
+	p.read()
+
+	return &ast.BreakStmt{}
+}
+
+func (p *Parser) parseBreakAllStmt() *ast.BreakAllStmt {
+	p.expect(lexer.BREAKALL)
+	p.read()
+
+	p.expect(lexer.SEMICOLON)
+	p.read()
+
+	return &ast.BreakAllStmt{}
 }
 
 func (p *Parser) parseIfStmt() *ast.IfStmt {
@@ -286,6 +328,50 @@ func (p *Parser) parseIfStmt() *ast.IfStmt {
 		Body:   body,
 		Else:   elseBody,
 		ElseIf: elseIfs,
+	}
+}
+
+func (p *Parser) parseLoopStmt() *ast.LoopStmt {
+	p.expect(lexer.LOOP)
+	p.read()
+
+	body := p.parseScopeStmt()
+
+	return &ast.LoopStmt{
+		Body: body,
+	}
+}
+
+func (p *Parser) parseDoWhileStmt() *ast.DoWhileStmt {
+	p.expect(lexer.DO)
+	p.read()
+
+	body := p.parseScopeStmt()
+
+	p.expect(lexer.WHILE)
+	p.read()
+
+	cond := p.parseParenExpr()
+
+	p.expect(lexer.SEMICOLON)
+	p.read()
+
+	return &ast.DoWhileStmt{
+		Cond: cond,
+		Body: body,
+	}
+}
+
+func (p *Parser) parseWhileStmt() *ast.WhileStmt {
+	p.expect(lexer.WHILE)
+	p.read()
+
+	cond := p.parseParenExpr()
+	body := p.parseScopeStmt()
+
+	return &ast.WhileStmt{
+		Cond: cond,
+		Body: body,
 	}
 }
 

@@ -33,16 +33,30 @@ type VarDeclStmt struct {
 	Const  bool
 }
 
+type LoopStmt struct {
+	Body *ScopeStmt
+}
+
+type WhileStmt struct {
+	Cond Expr
+	Body *ScopeStmt
+}
+
+type DoWhileStmt struct {
+	Cond Expr
+	Body *ScopeStmt
+}
+
 type ElseIf struct {
 	Cond Expr
 	Body *ScopeStmt
 }
 
 type IfStmt struct {
-	Cond Expr
-	Body *ScopeStmt
+	Cond   Expr
+	Body   *ScopeStmt
 	ElseIf []ElseIf
-	Else *ScopeStmt
+	Else   *ScopeStmt
 }
 
 type ExprStmt struct {
@@ -53,6 +67,12 @@ type ReturnStmt struct {
 	Expr Expr
 }
 
+type BreakStmt struct{}
+
+type ContinueStmt struct{}
+
+type BreakAllStmt struct{}
+
 func (f *FuncDeclStmt) TopStmtNode() {}
 func (v *VarDeclStmt) TopStmtNode()  {}
 
@@ -61,4 +81,10 @@ func (f *FuncDeclStmt) StmtNode() {}
 func (v *VarDeclStmt) StmtNode()  {}
 func (e *ExprStmt) StmtNode()     {}
 func (i *IfStmt) StmtNode()       {}
+func (l *LoopStmt) StmtNode()     {}
+func (w *WhileStmt) StmtNode()    {}
+func (d *DoWhileStmt) StmtNode()  {}
 func (r *ReturnStmt) StmtNode()   {}
+func (b *BreakStmt) StmtNode()    {}
+func (c *ContinueStmt) StmtNode() {}
+func (b *BreakAllStmt) StmtNode() {}
