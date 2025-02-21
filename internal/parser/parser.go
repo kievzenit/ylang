@@ -52,6 +52,17 @@ var bindingPowerLookup map[lexer.TokenKind]int = map[lexer.TokenKind]int{
 	lexer.ASTERISK: 20,
 	lexer.SLASH:    20,
 	lexer.PERCENT:  20,
+	lexer.BAND:	 30,
+	lexer.BOR:	 30,
+	lexer.BXOR:	 30,
+	lexer.LT: 40,
+	lexer.LEQ: 40,
+	lexer.GT: 40,
+	lexer.GEQ: 40,
+	lexer.EQ: 50,
+	lexer.NEQ: 50,
+	lexer.LAND: 60,
+	lexer.LOR: 60,
 }
 
 func NewParser(scanner lexer.TokenScanner, eh compiler_errors.ErrorHandler) *Parser {
@@ -81,9 +92,7 @@ func (p *Parser) parseTopSmt() ast.TopStmt {
 	case lexer.STATIC:
 		p.read()
 		return p.parseVarDeclStmt(true)
-	case lexer.CONST:
-		return p.parseVarDeclStmt(false)
-	case lexer.LET:
+	case lexer.CONST, lexer.LET:
 		return p.parseVarDeclStmt(false)
 	}
 
@@ -148,6 +157,51 @@ func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
 
 func (p *Parser) parseStmt() ast.Stmt {
 	switch p.curr.Kind {
+	case lexer.IF:
+		return p.parseControlStmt()
+	case lexer.RETURN:
+		return p.parseJumpStmt()
+	case lexer.STATIC, lexer.CONST, lexer.LET:
+		return p.parseLocalStmt()
+	case lexer.RBRACE:
+		return p.parseScopeStmt()
+	}
+
+	p.eh.AddError(&UnexpectedError{
+		Unexpected: p.curr.Kind,
+	})
+	p.eh.FailNow()
+	panic("unreachable")
+}
+
+func (p *Parser) parseControlStmt() ast.Stmt {
+	switch p.curr.Kind {
+	case lexer.IF:
+		return p.parseIfStmt()
+	}
+
+	p.eh.AddError(&UnexpectedError{
+		Unexpected: p.curr.Kind,
+	})
+	p.eh.FailNow()
+	panic("unreachable")
+}
+
+func (p *Parser) parseJumpStmt() ast.Stmt {
+	switch p.curr.Kind {
+	case lexer.RETURN:
+		return p.parseReturnStmt()
+	}
+
+	p.eh.AddError(&UnexpectedError{
+		Unexpected: p.curr.Kind,
+	})
+	p.eh.FailNow()
+	panic("unreachable")
+}
+
+func (p *Parser) parseLocalStmt() ast.Stmt {
+	switch p.curr.Kind {
 	case lexer.STATIC:
 		p.read()
 		return p.parseVarDeclStmt(true)
@@ -158,6 +212,79 @@ func (p *Parser) parseStmt() ast.Stmt {
 	}
 
 	return p.parseExprStmt()
+}
+
+func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
+	p.expect(lexer.RETURN)
+	p.read()
+
+	if p.curr.Kind == lexer.SEMICOLON {
+		p.read()
+		return &ast.ReturnStmt{}
+	}
+
+	expr := p.parseExpr()
+	p.expect(lexer.SEMICOLON)
+	p.read()
+
+	return &ast.ReturnStmt{
+		Expr: expr,
+	}
+}
+
+func (p *Parser) parseIfStmt() *ast.IfStmt {
+	p.expect(lexer.IF)
+	p.read()
+
+	cond := p.parseParenExpr()
+	body := p.parseScopeStmt()
+
+	if p.curr.Kind != lexer.ELSE {
+		return &ast.IfStmt{
+			Cond:   cond,
+			Body:   body,
+			Else:   nil,
+			ElseIf: nil,
+		}
+	}
+
+	elseIfs := make([]ast.ElseIf, 0)
+	for p.scanner.HasTokens() && p.curr.Kind == lexer.ELSE {
+		p.read()
+		if p.curr.Kind == lexer.IF {
+			p.read()
+			cond := p.parseParenExpr()
+			body := p.parseScopeStmt()
+			elseIfs = append(elseIfs, ast.ElseIf{
+				Cond: cond,
+				Body: body,
+			})
+			continue
+		}
+
+		p.unread()
+		break
+	}
+
+	if p.curr.Kind != lexer.ELSE {
+		return &ast.IfStmt{
+			Cond:   cond,
+			Body:   body,
+			Else:   nil,
+			ElseIf: elseIfs,
+		}
+	}
+
+	p.expect(lexer.ELSE)
+	p.read()
+	elseBody := p.parseScopeStmt()
+
+	return &ast.IfStmt{
+		Cond:   cond,
+		Body:   body,
+		Else:   elseBody,
+		ElseIf: elseIfs,
+	}
 }
 
 func (p *Parser) parseScopeStmt() *ast.ScopeStmt {

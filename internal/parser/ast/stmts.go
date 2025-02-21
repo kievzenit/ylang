@@ -33,7 +33,23 @@ type VarDeclStmt struct {
 	Const  bool
 }
 
+type ElseIf struct {
+	Cond Expr
+	Body *ScopeStmt
+}
+
+type IfStmt struct {
+	Cond Expr
+	Body *ScopeStmt
+	ElseIf []ElseIf
+	Else *ScopeStmt
+}
+
 type ExprStmt struct {
+	Expr Expr
+}
+
+type ReturnStmt struct {
 	Expr Expr
 }
 
@@ -44,3 +60,5 @@ func (s *ScopeStmt) StmtNode()    {}
 func (f *FuncDeclStmt) StmtNode() {}
 func (v *VarDeclStmt) StmtNode()  {}
 func (e *ExprStmt) StmtNode()     {}
+func (i *IfStmt) StmtNode()       {}
+func (r *ReturnStmt) StmtNode()   {}
