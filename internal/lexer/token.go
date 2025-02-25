@@ -31,6 +31,12 @@ const (
 	DIV_ASSIGN // /=
 	MOD_ASSIGN // %=
 
+	BAND_ASSIGN // &=
+	BOR_ASSIGN  // |=
+	BXOR_ASSIGN // ^=
+	SHR_ASSIGN  // >>=
+	SHL_ASSIGN  // <<=
+
 	INC // ++
 	DEC // --
 
@@ -129,6 +135,16 @@ func (tk TokenKind) String() string {
 		return "DIV_ASSIGN"
 	case MOD_ASSIGN:
 		return "MOD_ASSIGN"
+	case BAND_ASSIGN:
+		return "BAND_ASSIGN"
+	case BOR_ASSIGN:
+		return "BOR_ASSIGN"
+	case BXOR_ASSIGN:
+		return "BXOR_ASSIGN"
+	case SHR_ASSIGN:
+		return "SHR_ASSIGN"
+	case SHL_ASSIGN:
+		return "SHL_ASSIGN"
 	case INC:
 		return "INC"
 	case DEC:

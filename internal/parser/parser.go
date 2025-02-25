@@ -476,11 +476,53 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 			return p.parseCallExpr()
 		}
 
+		if p.isCurrAny(
+			lexer.ASSIGN,
+			lexer.ADD_ASSIGN,
+			lexer.SUB_ASSIGN,
+			lexer.MUL_ASSIGN,
+			lexer.DIV_ASSIGN,
+			lexer.MOD_ASSIGN,
+			lexer.BAND_ASSIGN,
+			lexer.BOR_ASSIGN,
+			lexer.BXOR_ASSIGN,
+			lexer.SHR_ASSIGN,
+			lexer.SHL_ASSIGN) {
+			p.unread()
+			return p.parseAssignExpr()
+		}
+
 		p.unread()
 		return p.parseIdentExpr()
 	}
 
 	return p.parseLiteralExpr()
+}
+
+func (p *Parser) parseAssignExpr() ast.Expr {
+	ident := p.parseIdentExpr()
+
+	p.expectAny(lexer.ASSIGN,
+		lexer.ADD_ASSIGN,
+		lexer.SUB_ASSIGN,
+		lexer.MUL_ASSIGN,
+		lexer.DIV_ASSIGN,
+		lexer.MOD_ASSIGN,
+		lexer.BAND_ASSIGN,
+		lexer.BOR_ASSIGN,
+		lexer.BXOR_ASSIGN,
+		lexer.SHR_ASSIGN,
+		lexer.SHL_ASSIGN)
+	op := p.curr
+	p.read()
+
+	value := p.parseExpr()
+
+	return &ast.AssignExpr{
+		Ident: ident,
+		Op:    op,
+		Value: value,
+	}
 }
 
 func (p *Parser) parseParenExpr() ast.Expr {
@@ -519,7 +561,7 @@ func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
 	}
 }
 
-func (p *Parser) parseCallExpr() ast.Expr {
+func (p *Parser) parseCallExpr() *ast.CallExpr {
 	p.expect(lexer.IDENT)
 	name := p.curr.Value
 	p.read()
@@ -544,7 +586,7 @@ func (p *Parser) parseCallExpr() ast.Expr {
 	}
 }
 
-func (p *Parser) parseIdentExpr() ast.Expr {
+func (p *Parser) parseIdentExpr() *ast.IdentExpr {
 	p.expect(lexer.IDENT)
 
 	ident := p.curr.Value
@@ -573,7 +615,7 @@ func (p *Parser) parseLiteralExpr() ast.Expr {
 	panic("unreachable")
 }
 
-func (p *Parser) parseIntegerExpr() ast.Expr {
+func (p *Parser) parseIntegerExpr() *ast.IntExpr {
 	p.expect(lexer.INT)
 
 	int, err := strconv.ParseInt(p.curr.Value, 10, 64)
@@ -588,7 +630,7 @@ func (p *Parser) parseIntegerExpr() ast.Expr {
 	}
 }
 
-func (p *Parser) parseFloatExpr() ast.Expr {
+func (p *Parser) parseFloatExpr() *ast.FloatExpr {
 	p.expect(lexer.FLOAT)
 
 	float, err := strconv.ParseFloat(p.curr.Value, 64)
@@ -603,7 +645,7 @@ func (p *Parser) parseFloatExpr() ast.Expr {
 	}
 }
 
-func (p *Parser) parseBoolExpr() ast.Expr {
+func (p *Parser) parseBoolExpr() *ast.BoolExpr {
 	p.expect(lexer.BOOL)
 
 	bool, err := strconv.ParseBool(p.curr.Value)
@@ -618,7 +660,7 @@ func (p *Parser) parseBoolExpr() ast.Expr {
 	}
 }
 
-func (p *Parser) parseCharExpr() ast.Expr {
+func (p *Parser) parseCharExpr() *ast.CharExpr {
 	p.expect(lexer.CHAR)
 
 	byte := p.curr.Value[0]
@@ -629,7 +671,7 @@ func (p *Parser) parseCharExpr() ast.Expr {
 	}
 }
 
-func (p *Parser) parseStringExpr() ast.Expr {
+func (p *Parser) parseStringExpr() *ast.StringExpr {
 	p.expect(lexer.STRING)
 	p.read()
 
@@ -659,16 +701,25 @@ func (p *Parser) expect(kind lexer.TokenKind) {
 }
 
 func (p *Parser) expectAny(kinds ...lexer.TokenKind) {
-	for _, kind := range kinds {
-		if p.curr.Kind == kind {
-			return
-		}
+	found := p.isCurrAny(kinds...)
+	if found {
+		return
 	}
+
 	p.eh.AddError(&UnexpectedExpectedManyError{
 		Unexpected: p.curr.Kind,
 		Expected:   kinds,
 	})
 	p.eh.FailNow()
+}
+
+func (p *Parser) isCurrAny(kinds ...lexer.TokenKind) bool {
+	for _, kind := range kinds {
+		if p.curr.Kind == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Parser) unexpected(kind lexer.TokenKind) {

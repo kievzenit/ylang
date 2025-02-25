@@ -26,6 +26,12 @@ type IdentExpr struct {
 	Value string
 }
 
+type AssignExpr struct {
+	Ident *IdentExpr
+	Op    lexer.Token
+	Value Expr
+}
+
 type CallExpr struct {
 	Name string
 	Args []Expr
@@ -43,5 +49,6 @@ func (f *FloatExpr) ExprNode()  {}
 func (c *CharExpr) ExprNode()   {}
 func (s *StringExpr) ExprNode() {}
 func (i *IdentExpr) ExprNode()  {}
+func (a *AssignExpr) ExprNode() {}
 func (c *CallExpr) ExprNode()   {}
 func (b *BinaryExpr) ExprNode() {}
