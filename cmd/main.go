@@ -22,10 +22,16 @@ func main() {
 
 	lexer := l.NewLexer(fileData, eh)
 	tokens := lexer.Tokenize()
+	sanitizedTokens := make([]l.Token, 0)
 	for _, token := range tokens {
+		if token.Kind == l.ONELINE_COMMENT || token.Kind == l.MULTILINE_COMMENT {
+			continue
+		}
+
+		sanitizedTokens = append(sanitizedTokens, token)
 		fmt.Println(token.String())
 	}
-	scanner := l.NewTokenScanner(tokens)
+	scanner := l.NewTokenScanner(sanitizedTokens)
 
 	parser := parser.NewParser(scanner, eh)
 	translationUnit := parser.Parse()

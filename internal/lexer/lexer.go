@@ -456,6 +456,53 @@ func (l *Lexer) processAsterisk() Token {
 	}
 }
 
+func (l *Lexer) processOneLineComment() Token {
+	content := make([]byte, 0)
+
+	l.advance()
+	for l.hasChars() {
+		if l.read() == '\n' {
+			break
+		}
+
+		content = append(content, l.read())
+		l.advance()
+	}
+
+	return Token{
+		Kind:  ONELINE_COMMENT,
+		Value: string(content),
+	}
+}
+
+func (l *Lexer) processMultiLineComment() Token {
+	content := make([]byte, 0)
+
+	l.advance()
+	for l.hasChars() {
+		if l.read() == '*' {
+			l.advance()
+			if l.hasChars() && l.read() == '/' {
+				l.advance()
+				break
+			}
+
+			if !l.hasChars() {
+				l.eh.AddError(newExpectedError('/'))
+				l.eh.FailNow()
+			}
+		}
+
+		content = append(content, l.read())
+		l.advance()
+	}
+
+	return Token{
+		Kind:  MULTILINE_COMMENT,
+		Value: string(content),
+	}
+}
+
 func (l *Lexer) processSlash() Token {
 	l.advance()
 	if !l.hasChars() {
@@ -470,6 +517,14 @@ func (l *Lexer) processSlash() Token {
 			Kind:  DIV_ASSIGN,
 			Value: "/=",
 		}
+	}
+
+	if l.read() == '/' {
+		return l.processOneLineComment()
+	}
+
+	if l.read() == '*' {
+		return l.processMultiLineComment()
 	}
 
 	l.unread()
@@ -541,10 +596,39 @@ func (l *Lexer) processAmpersand() Token {
 		}
 	}
 
+	if l.read() == '=' {
+		return Token{
+			Kind:  BAND_ASSIGN,
+			Value: "&=",
+		}
+	}
+
 	l.unread()
 	return Token{
 		Kind:  BAND,
 		Value: "&",
+	}
+}
+func (l *Lexer) processCaret() Token {
+	l.advance()
+	if !l.hasChars() {
+		return Token{
+			Kind:  XOR,
+			Value: "^",
+		}
+	}
+
+	if l.read() == '=' {
+		return Token{
+			Kind:  XOR_ASSIGN,
+			Value: "^=",
+		}
+	}
+
+	l.unread()
+	return Token{
+		Kind:  XOR,
+		Value: "^",
 	}
 }
 
@@ -561,6 +645,13 @@ func (l *Lexer) processPipe() Token {
 		return Token{
 			Kind:  LOR,
 			Value: "||",
+		}
+	}
+
+	if l.read() == '=' {
+		return Token{
+			Kind:  BOR_ASSIGN,
+			Value: "|=",
 		}
 	}
 
@@ -581,6 +672,14 @@ func (l *Lexer) processGreaterThan() Token {
 	}
 
 	if l.read() == '>' {
+		if l.hasChars() && l.next() == '=' {
+			l.advance()
+			return Token{
+				Kind:  SHR_ASSIGN,
+				Value: ">>=",
+			}
+		}
+
 		return Token{
 			Kind:  SHR,
 			Value: ">>",
@@ -618,6 +717,14 @@ func (l *Lexer) processLessThan() Token {
 	}
 
 	if l.read() == '<' {
+		if l.hasChars() && l.next() == '=' {
+			l.advance()
+			return Token{
+				Kind:  SHL_ASSIGN,
+				Value: "<<=",
+			}
+		}
+
 		return Token{
 			Kind:  SHL,
 			Value: "<<",
@@ -703,10 +810,7 @@ func (l *Lexer) processPunctuation() Token {
 	case '|':
 		return l.processPipe()
 	case '^':
-		return Token{
-			Kind:  BXOR,
-			Value: "^",
-		}
+		return l.processCaret()
 	case '>':
 		return l.processGreaterThan()
 	case '<':

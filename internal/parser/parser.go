@@ -54,7 +54,7 @@ var bindingPowerLookup map[lexer.TokenKind]int = map[lexer.TokenKind]int{
 	lexer.PERCENT:  20,
 	lexer.BAND:     30,
 	lexer.BOR:      30,
-	lexer.BXOR:     30,
+	lexer.XOR:     30,
 	lexer.SHL:      30,
 	lexer.SHR:      30,
 	lexer.LT:       40,
@@ -496,7 +496,7 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 			lexer.MOD_ASSIGN,
 			lexer.BAND_ASSIGN,
 			lexer.BOR_ASSIGN,
-			lexer.BXOR_ASSIGN,
+			lexer.XOR_ASSIGN,
 			lexer.SHR_ASSIGN,
 			lexer.SHL_ASSIGN) {
 			p.unread()
@@ -521,7 +521,7 @@ func (p *Parser) parseAssignExpr() ast.Expr {
 		lexer.MOD_ASSIGN,
 		lexer.BAND_ASSIGN,
 		lexer.BOR_ASSIGN,
-		lexer.BXOR_ASSIGN,
+		lexer.XOR_ASSIGN,
 		lexer.SHR_ASSIGN,
 		lexer.SHL_ASSIGN)
 	op := p.curr

@@ -9,6 +9,9 @@ type TokenKind int
 const (
 	EOF TokenKind = iota
 
+	ONELINE_COMMENT
+	MULTILINE_COMMENT
+
 	INT
 	FLOAT
 	BOOL
@@ -33,7 +36,7 @@ const (
 
 	BAND_ASSIGN // &=
 	BOR_ASSIGN  // |=
-	BXOR_ASSIGN // ^=
+	XOR_ASSIGN  // ^=
 	SHR_ASSIGN  // >>=
 	SHL_ASSIGN  // <<=
 
@@ -42,7 +45,7 @@ const (
 
 	BAND // &
 	BOR  // |
-	BXOR // ^
+	XOR  // ^
 	SHR  // >>
 	SHL  // <<
 
@@ -82,6 +85,8 @@ const (
 	TYPE
 	PUBLIC
 	PRIVATE
+	CTOR
+	DTOR
 	FUN
 	LET
 	CONST
@@ -101,6 +106,10 @@ func (tk TokenKind) String() string {
 	switch tk {
 	case EOF:
 		return "EOF"
+	case ONELINE_COMMENT:
+		return "ONELINE_COMMENT"
+	case MULTILINE_COMMENT:
+		return "MULTILINE_COMMENT"
 	case INT:
 		return "INT"
 	case FLOAT:
@@ -139,8 +148,8 @@ func (tk TokenKind) String() string {
 		return "BAND_ASSIGN"
 	case BOR_ASSIGN:
 		return "BOR_ASSIGN"
-	case BXOR_ASSIGN:
-		return "BXOR_ASSIGN"
+	case XOR_ASSIGN:
+		return "XOR_ASSIGN"
 	case SHR_ASSIGN:
 		return "SHR_ASSIGN"
 	case SHL_ASSIGN:
@@ -153,8 +162,8 @@ func (tk TokenKind) String() string {
 		return "BAND"
 	case BOR:
 		return "BOR"
-	case BXOR:
-		return "BXOR"
+	case XOR:
+		return "XOR"
 	case SHR:
 		return "SHR"
 	case SHL:
@@ -221,6 +230,10 @@ func (tk TokenKind) String() string {
 		return "PUBLIC"
 	case PRIVATE:
 		return "PRIVATE"
+	case CTOR:
+		return "CTOR"
+	case DTOR:
+		return "DTOR"
 	case FUN:
 		return "FUN"
 	case LET:
