@@ -1,16 +1,31 @@
 package ast
 
-type Stmt interface {
-	StmtNode()
-}
-
 type ScopeStmt struct {
 	Stmts []Stmt
 }
 
-type TopStmt interface {
-	Stmt
-	TopStmtNode()
+type TypeAccessModifier int
+
+const (
+	Private TypeAccessModifier = iota
+	Public
+)
+
+type TypeMember struct {
+	Name string
+	Type string
+	AccessModifier TypeAccessModifier
+}
+
+type TypeFuncMember struct {
+	*FuncDeclStmt
+	AccessModifier TypeAccessModifier
+}
+
+type TypeDeclStmt struct {
+	Name string
+	Members []TypeMember
+	Extern bool
 }
 
 type FuncDeclStmt struct {
@@ -73,10 +88,12 @@ type ContinueStmt struct{}
 
 type BreakAllStmt struct{}
 
+func (t *TypeDeclStmt) TopStmtNode() {}
 func (f *FuncDeclStmt) TopStmtNode() {}
 func (v *VarDeclStmt) TopStmtNode()  {}
 
 func (s *ScopeStmt) StmtNode()    {}
+func (t *TypeDeclStmt) StmtNode() {}
 func (f *FuncDeclStmt) StmtNode() {}
 func (v *VarDeclStmt) StmtNode()  {}
 func (e *ExprStmt) StmtNode()     {}

@@ -75,13 +75,46 @@ func NewParser(scanner lexer.TokenScanner, eh compiler_errors.ErrorHandler) *Par
 	}
 }
 
-func (p *Parser) Parse() []ast.TopStmt {
+func (p *Parser) Parse() ast.TranslationUnit {
+	packageStmt := p.parsePackageStmt()
+
 	stmts := make([]ast.TopStmt, 0)
 	for p.scanner.HasTokens() {
 		stmts = append(stmts, p.parseTopSmt())
 	}
 
-	return stmts
+	return ast.TranslationUnit{
+		Package: packageStmt,
+		Stmts:   stmts,
+	}
+}
+
+func (p *Parser) parsePackageStmt() *ast.PackageStmt {
+	var name string
+
+	p.expect(lexer.PACKAGE)
+	p.read()
+
+	p.expect(lexer.IDENT)
+	name += p.curr.Value
+	p.read()
+
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.SEMICOLON {
+		p.expect(lexer.COLONCOLON)
+		name += "::"
+		p.read()
+
+		p.expect(lexer.IDENT)
+		name += p.curr.Value
+		p.read()
+	}
+
+	p.expect(lexer.SEMICOLON)
+	p.read()
+
+	return &ast.PackageStmt{
+		Name: name,
+	}
 }
 
 func (p *Parser) parseTopSmt() ast.TopStmt {

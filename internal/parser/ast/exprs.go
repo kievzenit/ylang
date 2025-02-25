@@ -2,10 +2,6 @@ package ast
 
 import "github.com/kievzenit/ylang/internal/lexer"
 
-type Expr interface {
-	ExprNode()
-}
-
 type BoolExpr struct {
 	Value bool
 }

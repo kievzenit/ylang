@@ -28,8 +28,6 @@ func main() {
 	scanner := l.NewTokenScanner(tokens)
 
 	parser := parser.NewParser(scanner, eh)
-	stmts := parser.Parse()
-	for _, stmt := range stmts {
-		litter.Dump(stmt)
-	}
+	translationUnit := parser.Parse()
+	litter.Dump(translationUnit)
 }
