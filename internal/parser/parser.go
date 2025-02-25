@@ -179,6 +179,17 @@ func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
 	returnType := p.curr.Value
 	p.read()
 
+	if p.curr.Kind == lexer.SEMICOLON {
+		p.read()
+		return &ast.FuncDeclStmt{
+			Name:       name,
+			ReturnType: returnType,
+			Args:       args,
+			Body:       nil,
+			Extern:     extern,
+		}
+	}
+
 	body := p.parseScopeStmt()
 
 	return &ast.FuncDeclStmt{
