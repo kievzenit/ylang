@@ -189,6 +189,16 @@ func (l *Lexer) processIdentifier() Token {
 			Kind:  PRIVATE,
 			Value: identifier,
 		}
+	case "ctor":
+		return Token{
+			Kind:  CTOR,
+			Value: identifier,
+		}
+	case "dtor":
+		return Token{
+			Kind:  DTOR,
+			Value: identifier,
+		}
 	case "fun":
 		return Token{
 			Kind:  FUN,

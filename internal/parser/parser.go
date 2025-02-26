@@ -54,7 +54,7 @@ var bindingPowerLookup map[lexer.TokenKind]int = map[lexer.TokenKind]int{
 	lexer.PERCENT:  20,
 	lexer.BAND:     30,
 	lexer.BOR:      30,
-	lexer.XOR:     30,
+	lexer.XOR:      30,
 	lexer.SHL:      30,
 	lexer.SHR:      30,
 	lexer.LT:       40,
@@ -121,9 +121,18 @@ func (p *Parser) parseTopSmt() ast.TopStmt {
 	switch p.curr.Kind {
 	case lexer.EXTERN:
 		p.read()
-		return p.parseFuncDeclStmt(true)
+
+		if p.curr.Kind == lexer.FUN {
+			return p.parseFuncDeclStmt(true)
+		}
+
+		if p.curr.Kind == lexer.TYPE {
+			return p.parseTypeStmt(true)
+		}
 	case lexer.FUN:
 		return p.parseFuncDeclStmt(false)
+	case lexer.TYPE:
+		return p.parseTypeStmt(false)
 	case lexer.STATIC:
 		p.read()
 		return p.parseVarDeclStmt(true)
@@ -136,6 +145,153 @@ func (p *Parser) parseTopSmt() ast.TopStmt {
 	})
 	p.eh.FailNow()
 	panic("unreachable")
+}
+
+func (p *Parser) parseTypeStmt(extern bool) *ast.TypeDeclStmt {
+	p.expect(lexer.TYPE)
+	p.read()
+
+	p.expect(lexer.IDENT)
+	typeName := p.curr.Value
+	p.read()
+
+	p.expect(lexer.LBRACE)
+	p.read()
+
+	typeDeclStmt := &ast.TypeDeclStmt{
+		Name:         typeName,
+		Members:      make([]ast.TypeMember, 0),
+		Funcs:        make([]ast.TypeFuncMember, 0),
+		Constructors: make([]ast.TypeConstructor, 0),
+		Destructors:  make([]ast.TypeDestructor, 0),
+		Extern:       extern,
+	}
+
+	if p.curr.Kind == lexer.RBRACE {
+		return typeDeclStmt
+	}
+
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.RBRACE {
+		p.parseTypeMembers(typeDeclStmt)
+	}
+
+	p.expect(lexer.RBRACE)
+	p.read()
+
+	return typeDeclStmt
+}
+
+func (p *Parser) parseTypeMembers(typeDeclStmt *ast.TypeDeclStmt) {
+	p.expectAny(lexer.PUBLIC, lexer.PRIVATE)
+	accessModifier := p.curr
+	p.read()
+
+	p.expect(lexer.COLON)
+	p.read()
+
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.RBRACE {
+		switch p.curr.Kind {
+		case lexer.PUBLIC, lexer.PRIVATE:
+			if len(typeDeclStmt.Members) == 0 && len(typeDeclStmt.Funcs) == 0 {
+				p.eh.AddError(&UnexpectedError{
+					Unexpected: p.curr.Kind,
+				})
+				p.eh.FailNow()
+			}
+			return
+		case lexer.IDENT:
+			memberName := p.curr.Value
+			p.read()
+
+			p.expect(lexer.COLON)
+			p.read()
+
+			p.expect(lexer.IDENT)
+			memberType := p.curr.Value
+			p.read()
+
+			p.expect(lexer.SEMICOLON)
+			p.read()
+
+			typeDeclStmt.Members = append(typeDeclStmt.Members, ast.TypeMember{
+				Name:           memberName,
+				Type:           memberType,
+				AccessModifier: accessModifier,
+			})
+		case lexer.FUN:
+			memberFunc := p.parseFuncDeclStmt(false)
+			typeDeclStmt.Funcs = append(typeDeclStmt.Funcs, ast.TypeFuncMember{
+				FuncDeclStmt:   memberFunc,
+				AccessModifier: accessModifier,
+			})
+		case lexer.CTOR:
+			p.read()
+
+			p.expect(lexer.LPAREN)
+			p.read()
+
+			args := make([]ast.FuncArg, 0)
+			for p.scanner.HasTokens() && p.curr.Kind != lexer.RPAREN {
+				p.expect(lexer.IDENT)
+				argName := p.curr.Value
+				p.read()
+
+				p.expect(lexer.COLON)
+				p.read()
+
+				p.expect(lexer.IDENT)
+				argType := p.curr.Value
+				p.read()
+
+				args = append(args, ast.FuncArg{
+					Name: argName,
+					Type: argType,
+				})
+
+				if p.curr.Kind == lexer.COMMA {
+					p.read()
+				}
+			}
+
+			p.expect(lexer.RPAREN)
+			p.read()
+
+			body := p.parseScopeStmt()
+
+			typeDeclStmt.Constructors = append(typeDeclStmt.Constructors, ast.TypeConstructor{
+				Args:           args,
+				Body:           body,
+				AccessModifier: accessModifier,
+			})
+		case lexer.DTOR:
+			p.read()
+
+			p.expect(lexer.LPAREN)
+			p.read()
+
+			p.expect(lexer.RPAREN)
+			p.read()
+
+			body := p.parseScopeStmt()
+
+			typeDeclStmt.Destructors = append(typeDeclStmt.Destructors, ast.TypeDestructor{
+				Body:           body,
+				AccessModifier: accessModifier,
+			})
+		default:
+			p.eh.AddError(&UnexpectedError{
+				Unexpected: p.curr.Kind,
+			})
+			p.eh.FailNow()
+		}
+	}
+
+	if len(typeDeclStmt.Members) == 0 && len(typeDeclStmt.Funcs) == 0 {
+		p.eh.AddError(&UnexpectedError{
+			Unexpected: p.curr.Kind,
+		})
+		p.eh.FailNow()
+	}
 }
 
 func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {

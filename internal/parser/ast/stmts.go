@@ -1,5 +1,7 @@
 package ast
 
+import "github.com/kievzenit/ylang/internal/lexer"
+
 type ScopeStmt struct {
 	Stmts []Stmt
 }
@@ -12,20 +14,34 @@ const (
 )
 
 type TypeMember struct {
-	Name string
-	Type string
-	AccessModifier TypeAccessModifier
+	Name           string
+	Type           string
+	AccessModifier lexer.Token
 }
 
 type TypeFuncMember struct {
 	*FuncDeclStmt
-	AccessModifier TypeAccessModifier
+	AccessModifier lexer.Token
+}
+
+type TypeConstructor struct {
+	Args           []FuncArg
+	Body           *ScopeStmt
+	AccessModifier lexer.Token
+}
+
+type TypeDestructor struct {
+	Body           *ScopeStmt
+	AccessModifier lexer.Token
 }
 
 type TypeDeclStmt struct {
-	Name string
-	Members []TypeMember
-	Extern bool
+	Name         string
+	Constructors []TypeConstructor
+	Destructors  []TypeDestructor
+	Members      []TypeMember
+	Funcs        []TypeFuncMember
+	Extern       bool
 }
 
 type FuncDeclStmt struct {
