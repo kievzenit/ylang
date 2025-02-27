@@ -37,18 +37,30 @@ type CallExpr struct {
 	Args []Expr
 }
 
+type ArraySubscriptExpr struct {
+	Left  Expr
+	Index Expr
+}
+
+type MemberAccessExpr struct {
+	Left  Expr
+	Right Expr
+}
+
 type BinaryExpr struct {
 	Left  Expr
 	Op    lexer.Token
 	Right Expr
 }
 
-func (b *BoolExpr) ExprNode()   {}
-func (i *IntExpr) ExprNode()    {}
-func (f *FloatExpr) ExprNode()  {}
-func (c *CharExpr) ExprNode()   {}
-func (s *StringExpr) ExprNode() {}
-func (i *IdentExpr) ExprNode()  {}
-func (a *AssignExpr) ExprNode() {}
-func (c *CallExpr) ExprNode()   {}
-func (b *BinaryExpr) ExprNode() {}
+func (b *BoolExpr) ExprNode()           {}
+func (i *IntExpr) ExprNode()            {}
+func (f *FloatExpr) ExprNode()          {}
+func (c *CharExpr) ExprNode()           {}
+func (s *StringExpr) ExprNode()         {}
+func (i *IdentExpr) ExprNode()          {}
+func (a *AssignExpr) ExprNode()         {}
+func (c *CallExpr) ExprNode()           {}
+func (a *ArraySubscriptExpr) ExprNode() {}
+func (m *MemberAccessExpr) ExprNode()   {}
+func (b *BinaryExpr) ExprNode()         {}

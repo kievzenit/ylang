@@ -136,8 +136,6 @@ func (p *Parser) parseTopSmt() ast.TopStmt {
 	case lexer.STATIC:
 		p.read()
 		return p.parseVarDeclStmt(true)
-	case lexer.CONST, lexer.LET:
-		return p.parseVarDeclStmt(false)
 	}
 
 	p.eh.AddError(&UnexpectedError{
@@ -363,11 +361,11 @@ func (p *Parser) parseStmt() ast.Stmt {
 		return p.parseControlStmt()
 	case lexer.RETURN, lexer.CONTINUE, lexer.BREAK, lexer.BREAKALL:
 		return p.parseJumpStmt()
-	case lexer.STATIC, lexer.CONST, lexer.LET:
-		return p.parseLocalStmt()
 	case lexer.RBRACE:
 		return p.parseScopeStmt()
 	}
+
+	return p.parseLocalStmt()
 
 	p.eh.AddError(&UnexpectedError{
 		Unexpected: p.curr.Kind,
@@ -628,8 +626,51 @@ func (p *Parser) parseExprStmt() ast.Stmt {
 }
 
 func (p *Parser) parseExpr() ast.Expr {
-	left := p.parsePrimaryExpr()
+	left := p.parsePostfixExpr()
 	return p.parseBinaryExpr(left, 0)
+}
+
+func (p *Parser) parsePostfixExpr() ast.Expr {
+	expr := p.parsePrimaryExpr()
+
+	for p.scanner.HasTokens() && p.isCurrAny(lexer.DOT, lexer.LBRACKET) {
+		switch p.curr.Kind {
+		case lexer.DOT:
+			p.read()
+
+			p.expect(lexer.IDENT)
+			memberName := p.curr.Value
+			p.read()
+
+			var right ast.Expr
+			switch p.curr.Kind {
+			case lexer.LPAREN:
+				p.unread()
+				right = p.parseCallExpr()
+			default:
+				right = &ast.IdentExpr{Value: memberName}
+			}
+
+			expr = &ast.MemberAccessExpr{
+				Left:  expr,
+				Right: right,
+			}
+		case lexer.LBRACKET:
+			p.read()
+
+			indexExpr := p.parseExpr()
+
+			p.expect(lexer.RBRACKET)
+			p.read()
+
+			expr = &ast.ArraySubscriptExpr{
+				Left:  expr,
+				Index: indexExpr,
+			}
+		}
+	}
+
+	return expr
 }
 
 func (p *Parser) parsePrimaryExpr() ast.Expr {
@@ -713,7 +754,7 @@ func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
 		}
 		p.read()
 
-		right := p.parsePrimaryExpr()
+		right := p.parsePostfixExpr()
 
 		nextBindingPower, ok := bindingPowerLookup[p.curr.Kind]
 		if !ok || currentBindingPower < nextBindingPower {
