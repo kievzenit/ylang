@@ -1,0 +1,180 @@
+<translation_unit> ::= <package_statement> <top_statement>*
+
+<package_statement> ::= "package" <identifier_literal> ("::" <identifier_literal>)* ";"
+
+<top_statement> ::= <function_declaration_statement> | <variable_declaration_statement> | <type_statement>
+
+<type_statement> ::= "extern"? "type" <identifier_literal> "{"
+    (<access_modifier_keyword> ":"
+        (<member_declaration_statement>
+            | <function_declaration_statement>
+            | <type_constructor>
+            | <type_destructor)+)*
+"}"
+
+<access_modifier_keyword> ::= "public" | "private"
+
+<type_constructor> ::= "ctor" <func_params> <scope_statement>
+<type_destructor> ::= "dtor" "(" ")" <scope_statement>
+
+<member_declaration_statement> ::= <identifier_literal> ":" <type_identifier> ";"
+
+<function_declaration_statement> ::= "extern"? "fun" <identifier_literal> <func_params> <func_return> (";" | <scope_statement>)
+
+<func_param> ::= <identifier_literal> ":" <type_identifier>
+<func_params> ::= "(" (<func_param> ("," <func_param>)*)? ")"
+<func_return> ::= <type_identifier>
+
+<statement> ::= <control_statement> | <jump_statement> | <local_statement> | <scope_statement>
+
+<scope_statement> ::= "{" <statement>* "}"
+
+<control_statement> ::= <if_statement>
+    | <while_statement>
+    | <do_while_statement>
+    | <loop_statement>
+    | <for_statement>
+
+<for_statement> ::= "for" "(" <for_init>? ";" <expression> ";" <for_after_each>? ")" <scope_statement>
+<for_init> ::= <local_statement> ("," <local_statement>)*
+<for_after_each> ::= <expression_statement> ("," <expression_statement>)*
+
+<loop_statement> ::= "loop" <scope_statement>
+<do_while_statement> ::= "do" <scope_statement> "while" <parenthesis_expression> ";"
+<while_statement> ::= "while" <parenthesis_expression> <scope_statement>
+
+<if_statement> ::= "if" <parenthesis_expression> <scope_statement> <else_if_statement>* <else_statement>?
+<else_if_statement> ::= "else" "if" <parenthesis_expression> <scope_statement>
+<else_statement> ::= "else" <scope_statement>
+
+<jump_statement> ::= <continue_statement>
+    | <break_statement>
+    | <breakall_statement>
+    | <return_statement>
+
+<continue_statement> ::= "continue" ";"
+<break_statement> ::= "break" ";"
+<breakall_statement> ::= "brekall" ";"
+<return_statement> ::= "return" <expression>? ";"
+
+<local_statement> ::= <variable_declaration_statement> | <expression_statement>
+
+<expression_statement> ::= <expression> ";"
+<variable_declaration_statement> ::= "static"? ("let" | "const") <identifier_literal> (":" <type_identifier>)? "=" <expression> ";"
+
+<expression> ::= <primary_expression>
+    | <postfix_expression>
+    | <binary_expression>
+    | <assignment_expression>
+    | <complex_cast_expression>
+
+<assignment_expression> ::= <identifier_literal> <assignment_operator> <expression>
+<assignment_operator> ::= "="
+    | "+="
+    | "-="
+    | "*="
+    | "/="
+    | "%="
+    | "&="
+    | "|="
+    | "^="
+    | ">>="
+    | "<<="
+
+<binary_expression> ::= <arithmetic_expression> | <relational_expression> | <logical_expression> | <bitwise_expression>
+<binary_operator> ::= <arithmetic_operator> | <relational_operator> | <logical_operator> | <bitwise_operator>
+
+<bitwise_expression> ::= <expression> <bitwise_operator> <expression>
+<bitwise_operator> ::= "&" | "|" | "^" | ">>" | "<<"
+
+<logical_expression> ::= <expression> <logical_operator> <expression>
+<logical_operator> ::= "&&" | "||"
+
+<arithmetic_expression> ::= <expression> <arithmetic_operator> <expression>
+<arithmetic_operator> ::= "+"
+    | "-"
+    | "*"
+    | "/"
+    | "%"
+
+<relational_expression> ::= <expression> <relational_operator> <expression>
+<relational_operator> ::= ">"
+    | "<"
+    | ">="
+    | "<="
+    | "!="
+    | "=="
+
+<postfix_expression> ::= <primary_expression> <postfix_part>*
+
+<postfix_part> ::= "." <identifier_literal>
+    | "[" <expression> "]"
+    | "(" (<expression> ("," <expression>)*)? ")"
+    | ">-" "{" <identifier_literal> ":" <type_identifier> "}"
+    | ">-" <type_identifier>
+
+<primary_expression> ::= <literal_expression>
+    | <identifier_expression>
+    | <parenthesis_expression>
+    | <call_expression>
+
+<call_expression> ::= <identifier_literal> "(" (<expression> ("," <expression>)*)? ")"
+<parenthesis_expression> ::= "(" <expression> ")"
+<identifier_expression> ::= <identifier_literal>
+
+<literal_expression> ::= <integer_expression> | <float_expression> | <boolean_expression> | <string_expression> | <char_expression>
+<string_expression> ::= <string_literal>
+<char_expression> ::= <char_literal>
+<integer_expression> ::= <integer_literal>
+<float_expression> ::= <float_literal>
+<boolean_expression> ::= "true" | "false"
+
+<string_literal> ::= "\"" .* "\"" // TODO: escape sequences
+<char_literal> ::= "'" .? "'" // TODO: escape sequences
+
+<type_identifier> ::= <identifier_literal>
+    | "[" <integer_literal>? "]" <type_identifier>
+
+<integer_type> ::= "i1"
+    | "i8"
+    | "i16"
+    | "i32"
+    | "i64"
+    | "size"
+    | "u8"
+    | "byte"
+    | "u16"
+    | "u32"
+    | "u64"
+    | "usize"
+
+<float_type> ::= "f16"
+    | "f32"
+    | "f64"
+    | "f80"
+    | "f128"
+
+<identifier_literal> ::= (<letter> | "_") (<letter> | <decimal_digit> | "_")*
+<letter> ::= [a-z] | [A-Z]
+
+<float_literal> ::= <decimal_number_literal> "." <decimal_number_literal> ("e" ("+" | "-")? <decimal_number_literal>)? (":" <float_type>)?
+
+<integer_literal> ::= <integer_literals> (":" <integer_type>)?
+
+<integer_literals> ::= <decimal_number_literal>
+    | <complex_hexadecimal_number_literal>
+    | <complex_decimal_number_literal>
+    | <complex_octal_number_literal>
+    | <complex_binary_number_literal>
+
+<complex_hexadecimal_number_literal> ::= "0x" <hexadecimal_digit>+
+<complex_decimal_number_literal> ::= "0d" <decimal_digit>+
+<complex_octal_number_literal> ::= "0o" <octal_digit>+
+<complex_binary_number_literal> ::= "0b" <binary_digit>+
+
+<decimal_number_literal> ::= <decimal_digit> ("_" | <decimal_digit>)*
+
+<hexadecimal_digit> ::= [0-9a-f]
+<decimal_digit> ::= [0-9]
+<octal_digit> ::= [0-7]
+<binary_digit> ::= [0-1]
