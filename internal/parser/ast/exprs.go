@@ -47,6 +47,12 @@ type MemberAccessExpr struct {
 	Right Expr
 }
 
+type CastExpr struct {
+	Left     Expr
+	NewIdent *IdentExpr
+	Type     string
+}
+
 type BinaryExpr struct {
 	Left  Expr
 	Op    lexer.Token
@@ -63,4 +69,5 @@ func (a *AssignExpr) ExprNode()         {}
 func (c *CallExpr) ExprNode()           {}
 func (a *ArraySubscriptExpr) ExprNode() {}
 func (m *MemberAccessExpr) ExprNode()   {}
+func (c *CastExpr) ExprNode()           {}
 func (b *BinaryExpr) ExprNode()         {}

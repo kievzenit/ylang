@@ -58,10 +58,11 @@ type FuncArg struct {
 }
 
 type VarDeclStmt struct {
-	Name   string
-	Value  Expr
-	Static bool
-	Const  bool
+	Name         string
+	ExplicitType string
+	Value        Expr
+	Static       bool
+	Const        bool
 }
 
 type LoopStmt struct {

@@ -204,9 +204,7 @@ func (p *Parser) parseTypeMembers(typeDeclStmt *ast.TypeDeclStmt) {
 			p.expect(lexer.COLON)
 			p.read()
 
-			p.expect(lexer.IDENT)
-			memberType := p.curr.Value
-			p.read()
+			memberType := p.parseTypeIdentifier()
 
 			p.expect(lexer.SEMICOLON)
 			p.read()
@@ -312,9 +310,7 @@ func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
 		p.expect(lexer.COLON)
 		p.read()
 
-		p.expect(lexer.IDENT)
-		argType := p.curr.Value
-		p.read()
+		argType := p.parseTypeIdentifier()
 
 		args = append(args, ast.FuncArg{
 			Name: argName,
@@ -328,10 +324,8 @@ func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
 
 	p.expect(lexer.RPAREN)
 	p.read()
-
-	p.expect(lexer.IDENT)
-	returnType := p.curr.Value
-	p.read()
+	
+	returnType := p.parseTypeIdentifier()
 
 	if p.curr.Kind == lexer.SEMICOLON {
 		p.read()
@@ -366,12 +360,6 @@ func (p *Parser) parseStmt() ast.Stmt {
 	}
 
 	return p.parseLocalStmt()
-
-	p.eh.AddError(&UnexpectedError{
-		Unexpected: p.curr.Kind,
-	})
-	p.eh.FailNow()
-	panic("unreachable")
 }
 
 func (p *Parser) parseControlStmt() ast.Stmt {
@@ -591,12 +579,19 @@ func (p *Parser) parseScopeStmt() *ast.ScopeStmt {
 }
 
 func (p *Parser) parseVarDeclStmt(static bool) *ast.VarDeclStmt {
+	var explicitType string
+
 	p.expectAny(lexer.LET, lexer.CONST)
 	isConst := p.curr.Kind == lexer.CONST
 
 	p.read()
 	p.expect(lexer.IDENT)
 	varName := p.curr.Value
+
+	if p.curr.Kind == lexer.COLON {
+		p.read()
+		explicitType = p.parseTypeIdentifier()
+	}
 
 	p.read()
 	p.expect(lexer.ASSIGN)
@@ -608,10 +603,11 @@ func (p *Parser) parseVarDeclStmt(static bool) *ast.VarDeclStmt {
 	p.read()
 
 	return &ast.VarDeclStmt{
-		Name:   varName,
-		Value:  expr,
-		Static: static,
-		Const:  isConst,
+		Name:         varName,
+		ExplicitType: explicitType,
+		Value:        expr,
+		Static:       static,
+		Const:        isConst,
 	}
 }
 
@@ -625,6 +621,29 @@ func (p *Parser) parseExprStmt() ast.Stmt {
 	}
 }
 
+func (p *Parser) parseTypeIdentifier() string {
+	var typeName string
+	for p.scanner.HasTokens() && p.curr.Kind == lexer.LBRACKET {
+		typeName += p.curr.Value
+		p.read()
+
+		if p.curr.Kind == lexer.INT {
+			typeName += p.curr.Value
+			p.read()
+		}
+
+		p.expect(lexer.RBRACKET)
+		typeName += p.curr.Value
+		p.read()
+	}
+
+	p.expect(lexer.IDENT)
+	typeName += p.curr.Value
+	p.read()
+
+	return typeName
+}
+
 func (p *Parser) parseExpr() ast.Expr {
 	left := p.parsePostfixExpr()
 	return p.parseBinaryExpr(left, 0)
@@ -633,7 +652,7 @@ func (p *Parser) parseExpr() ast.Expr {
 func (p *Parser) parsePostfixExpr() ast.Expr {
 	expr := p.parsePrimaryExpr()
 
-	for p.scanner.HasTokens() && p.isCurrAny(lexer.DOT, lexer.LBRACKET) {
+	for p.scanner.HasTokens() && p.isCurrAny(lexer.DOT, lexer.LBRACKET, lexer.CAST) {
 		switch p.curr.Kind {
 		case lexer.DOT:
 			p.read()
@@ -666,6 +685,38 @@ func (p *Parser) parsePostfixExpr() ast.Expr {
 			expr = &ast.ArraySubscriptExpr{
 				Left:  expr,
 				Index: indexExpr,
+			}
+		case lexer.CAST:
+			p.read()
+
+			if p.curr.Kind != lexer.LBRACE {
+				typeName := p.parseTypeIdentifier()
+
+				expr = &ast.CastExpr{
+					Left:     expr,
+					NewIdent: nil,
+					Type:     typeName,
+				}
+				continue
+			}
+
+			p.expect(lexer.LBRACE)
+			p.read()
+
+			newIdent := p.parseIdentExpr()
+
+			p.expect(lexer.COLON)
+			p.read()
+
+			typeName := p.parseTypeIdentifier()
+
+			p.expect(lexer.RBRACE)
+			p.read()
+
+			expr = &ast.CastExpr{
+				Left:     expr,
+				NewIdent: newIdent,
+				Type:     typeName,
 			}
 		}
 	}
