@@ -265,9 +265,16 @@ func (tk TokenKind) String() string {
 	}
 }
 
+type TokenMetadata struct {
+	Line   int
+	Length int
+	Column int
+}
+
 type Token struct {
-	Kind  TokenKind
-	Value string
+	Kind     TokenKind
+	Value    string
+	Metadata TokenMetadata
 }
 
 func (t *Token) hasActualValue() bool {

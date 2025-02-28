@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/kievzenit/ylang/internal/compiler_errors"
 	l "github.com/kievzenit/ylang/internal/lexer"
@@ -18,9 +19,15 @@ func main() {
 		return
 	}
 
+	absoluteFileName, err := filepath.Abs(fileName)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	eh := compiler_errors.NewErrorHandler(os.Stderr)
 
-	lexer := l.NewLexer(fileData, eh)
+	lexer := l.NewLexer(absoluteFileName, fileData, eh)
 	tokens := lexer.Tokenize()
 	sanitizedTokens := make([]l.Token, 0)
 	for _, token := range tokens {
@@ -33,7 +40,7 @@ func main() {
 	}
 	scanner := l.NewTokenScanner(sanitizedTokens)
 
-	parser := parser.NewParser(scanner, eh)
+	parser := parser.NewParser(absoluteFileName, scanner, eh)
 	translationUnit := parser.Parse()
 	litter.Dump(translationUnit)
 }

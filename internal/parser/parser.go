@@ -7,20 +7,47 @@ import (
 	"github.com/kievzenit/ylang/internal/compiler_errors"
 	"github.com/kievzenit/ylang/internal/lexer"
 	"github.com/kievzenit/ylang/internal/parser/ast"
+	"slices"
 )
 
 type UnexpectedExpectedError struct {
 	Unexpected lexer.TokenKind
 	Expected   lexer.TokenKind
+
+	FileName string
+	Line     int
+	Column   int
+	Length   int
 }
 
 func (e *UnexpectedExpectedError) GetMessage() string {
 	return fmt.Sprintf("unexpected token: '%s', expected: '%s'", e.Unexpected.String(), e.Expected.String())
 }
 
+func (e *UnexpectedExpectedError) GetFileName() string {
+	return e.FileName
+}
+
+func (e *UnexpectedExpectedError) GetLine() int {
+	return e.Line
+}
+
+func (e *UnexpectedExpectedError) GetColumn() int {
+	return e.Column
+}
+
+func (e *UnexpectedExpectedError) GetLength() int {
+	return e.Length
+}
+
 type UnexpectedExpectedManyError struct {
 	Unexpected lexer.TokenKind
 	Expected   []lexer.TokenKind
+
+	FileName string
+	Line     int
+	Column   int
+	Length   int
 }
 
 func (e *UnexpectedExpectedManyError) GetMessage() string {
@@ -31,15 +58,54 @@ func (e *UnexpectedExpectedManyError) GetMessage() string {
 	return fmt.Sprintf("unexpected token: '%s', expected one of: '%s'", e.Unexpected.String(), expectedKinds)
 }
 
+func (e *UnexpectedExpectedManyError) GetFileName() string {
+	return e.FileName
+}
+
+func (e *UnexpectedExpectedManyError) GetLine() int {
+	return e.Line
+}
+
+func (e *UnexpectedExpectedManyError) GetColumn() int {
+	return e.Column
+}
+
+func (e *UnexpectedExpectedManyError) GetLength() int {
+	return e.Length
+}
+
 type UnexpectedError struct {
 	Unexpected lexer.TokenKind
+
+	FileName string
+	Line     int
+	Column   int
+	Length   int
 }
 
 func (e *UnexpectedError) GetMessage() string {
 	return fmt.Sprintf("unexpected token: '%s'", e.Unexpected.String())
 }
 
+func (e *UnexpectedError) GetFileName() string {
+	return e.FileName
+}
+
+func (e *UnexpectedError) GetLine() int {
+	return e.Line
+}
+
+func (e *UnexpectedError) GetColumn() int {
+	return e.Column
+}
+
+func (e *UnexpectedError) GetLength() int {
+	return e.Length
+}
+
 type Parser struct {
+	fileName string
+
 	scanner lexer.TokenScanner
 	eh      compiler_errors.ErrorHandler
 
@@ -67,11 +133,12 @@ var bindingPowerLookup map[lexer.TokenKind]int = map[lexer.TokenKind]int{
 	lexer.LOR:      60,
 }
 
-func NewParser(scanner lexer.TokenScanner, eh compiler_errors.ErrorHandler) *Parser {
+func NewParser(fileName string, scanner lexer.TokenScanner, eh compiler_errors.ErrorHandler) *Parser {
 	return &Parser{
-		scanner: scanner,
-		eh:      eh,
-		curr:    scanner.Read(),
+		fileName: fileName,
+		scanner:  scanner,
+		eh:       eh,
+		curr:     scanner.Read(),
 	}
 }
 
@@ -324,7 +391,7 @@ func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
 
 	p.expect(lexer.RPAREN)
 	p.read()
-	
+
 	returnType := p.parseTypeIdentifier()
 
 	if p.curr.Kind == lexer.SEMICOLON {
@@ -954,6 +1021,11 @@ func (p *Parser) expect(kind lexer.TokenKind) {
 		p.eh.AddError(&UnexpectedExpectedError{
 			Unexpected: p.curr.Kind,
 			Expected:   kind,
+
+			FileName: p.fileName,
+			Line:     p.curr.Metadata.Line,
+			Column:   p.curr.Metadata.Column,
+			Length:   p.curr.Metadata.Length,
 		})
 		p.eh.FailNow()
 	}
@@ -968,22 +1040,27 @@ func (p *Parser) expectAny(kinds ...lexer.TokenKind) {
 	p.eh.AddError(&UnexpectedExpectedManyError{
 		Unexpected: p.curr.Kind,
 		Expected:   kinds,
+
+		FileName: p.fileName,
+		Line:     p.curr.Metadata.Line,
+		Column:   p.curr.Metadata.Column,
+		Length:   p.curr.Metadata.Length,
 	})
 	p.eh.FailNow()
 }
 
 func (p *Parser) isCurrAny(kinds ...lexer.TokenKind) bool {
-	for _, kind := range kinds {
-		if p.curr.Kind == kind {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(kinds, p.curr.Kind)
 }
 
 func (p *Parser) unexpected(kind lexer.TokenKind) {
 	p.eh.AddError(&UnexpectedError{
 		Unexpected: kind,
+
+		FileName: p.fileName,
+		Line:     p.curr.Metadata.Line,
+		Column:   p.curr.Metadata.Column,
+		Length:   p.curr.Metadata.Length,
 	})
 	p.eh.FailNow()
 }

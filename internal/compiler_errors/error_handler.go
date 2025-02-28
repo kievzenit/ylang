@@ -8,6 +8,10 @@ import (
 
 type CompilerError interface {
 	GetMessage() string
+	GetFileName() string
+	GetLine() int
+	GetColumn() int
+	GetLength() int
 }
 
 type ErrorHandler interface {
@@ -33,9 +37,12 @@ func (eh *CompilerErrorHandler) AddError(err CompilerError) {
 
 func (eh *CompilerErrorHandler) FailNow() {
 	fmt.Fprintln(eh.writer, "Build failed with errors:")
+	fmt.Fprintln(eh.writer)
 
 	for _, err := range eh.errors {
 		fmt.Fprintf(eh.writer, "ERROR: %s\n", err.GetMessage())
+		fmt.Fprintf(eh.writer, "---> %s:%d:%d\n", err.GetFileName(), err.GetLine(), err.GetColumn())
+		fmt.Fprintln(eh.writer)
 	}
 
 	os.Exit(1)
