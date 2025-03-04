@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strconv"
 
+	"slices"
+
+	"github.com/kievzenit/ylang/internal/ast"
 	"github.com/kievzenit/ylang/internal/compiler_errors"
 	"github.com/kievzenit/ylang/internal/lexer"
-	"github.com/kievzenit/ylang/internal/parser/ast"
-	"slices"
 )
 
 type UnexpectedExpectedError struct {
@@ -109,7 +110,7 @@ type Parser struct {
 	scanner lexer.TokenScanner
 	eh      compiler_errors.ErrorHandler
 
-	curr lexer.Token
+	curr *lexer.Token
 }
 
 var bindingPowerLookup map[lexer.TokenKind]int = map[lexer.TokenKind]int{
@@ -160,6 +161,7 @@ func (p *Parser) parsePackageStmt() *ast.PackageStmt {
 	var name string
 
 	p.expect(lexer.PACKAGE)
+	startToken := p.curr
 	p.read()
 
 	p.expect(lexer.IDENT)
@@ -180,6 +182,8 @@ func (p *Parser) parsePackageStmt() *ast.PackageStmt {
 	p.read()
 
 	return &ast.PackageStmt{
+		StartToken: startToken,
+
 		Name: name,
 	}
 }
@@ -187,22 +191,24 @@ func (p *Parser) parsePackageStmt() *ast.PackageStmt {
 func (p *Parser) parseTopSmt() ast.TopStmt {
 	switch p.curr.Kind {
 	case lexer.EXTERN:
+		startToken := p.curr
 		p.read()
 
 		if p.curr.Kind == lexer.FUN {
-			return p.parseFuncDeclStmt(true)
+			return p.parseFuncDeclStmt(true, startToken)
 		}
 
 		if p.curr.Kind == lexer.TYPE {
-			return p.parseTypeStmt(true)
+			return p.parseTypeStmt(true, startToken)
 		}
 	case lexer.FUN:
-		return p.parseFuncDeclStmt(false)
+		return p.parseFuncDeclStmt(false, nil)
 	case lexer.TYPE:
-		return p.parseTypeStmt(false)
+		return p.parseTypeStmt(false, nil)
 	case lexer.STATIC:
+		startToken := p.curr
 		p.read()
-		return p.parseVarDeclStmt(true)
+		return p.parseVarDeclStmt(true, startToken)
 	}
 
 	p.eh.AddError(&UnexpectedError{
@@ -212,8 +218,11 @@ func (p *Parser) parseTopSmt() ast.TopStmt {
 	panic("unreachable")
 }
 
-func (p *Parser) parseTypeStmt(extern bool) *ast.TypeDeclStmt {
+func (p *Parser) parseTypeStmt(extern bool, startToken *lexer.Token) *ast.TypeDeclStmt {
 	p.expect(lexer.TYPE)
+	if startToken == nil {
+		startToken = p.curr
+	}
 	p.read()
 
 	p.expect(lexer.IDENT)
@@ -224,6 +233,8 @@ func (p *Parser) parseTypeStmt(extern bool) *ast.TypeDeclStmt {
 	p.read()
 
 	typeDeclStmt := &ast.TypeDeclStmt{
+		StartToken: startToken,
+
 		Name:         typeName,
 		Members:      make([]ast.TypeMember, 0),
 		Funcs:        make([]ast.TypeFuncMember, 0),
@@ -282,7 +293,7 @@ func (p *Parser) parseTypeMembers(typeDeclStmt *ast.TypeDeclStmt) {
 				AccessModifier: accessModifier,
 			})
 		case lexer.FUN:
-			memberFunc := p.parseFuncDeclStmt(false)
+			memberFunc := p.parseFuncDeclStmt(false, nil)
 			typeDeclStmt.Funcs = append(typeDeclStmt.Funcs, ast.TypeFuncMember{
 				FuncDeclStmt:   memberFunc,
 				AccessModifier: accessModifier,
@@ -357,8 +368,14 @@ func (p *Parser) parseTypeMembers(typeDeclStmt *ast.TypeDeclStmt) {
 	}
 }
 
-func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
+func (p *Parser) parseFuncDeclStmt(
+	extern bool,
+	startToken *lexer.Token,
+) *ast.FuncDeclStmt {
 	p.expect(lexer.FUN)
+	if startToken == nil {
+		startToken = p.curr
+	}
 	p.read()
 
 	p.expect(lexer.IDENT)
@@ -397,6 +414,8 @@ func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
 	if p.curr.Kind == lexer.SEMICOLON {
 		p.read()
 		return &ast.FuncDeclStmt{
+			StartToken: startToken,
+
 			Name:       name,
 			ReturnType: returnType,
 			Args:       args,
@@ -408,6 +427,8 @@ func (p *Parser) parseFuncDeclStmt(extern bool) *ast.FuncDeclStmt {
 	body := p.parseScopeStmt()
 
 	return &ast.FuncDeclStmt{
+		StartToken: startToken,
+
 		Name:       name,
 		ReturnType: returnType,
 		Args:       args,
@@ -470,12 +491,13 @@ func (p *Parser) parseJumpStmt() ast.Stmt {
 func (p *Parser) parseLocalStmt() ast.Stmt {
 	switch p.curr.Kind {
 	case lexer.STATIC:
+		startToken := p.curr
 		p.read()
-		return p.parseVarDeclStmt(true)
+		return p.parseVarDeclStmt(true, startToken)
 	case lexer.CONST:
-		return p.parseVarDeclStmt(false)
+		return p.parseVarDeclStmt(false, nil)
 	case lexer.LET:
-		return p.parseVarDeclStmt(false)
+		return p.parseVarDeclStmt(false, nil)
 	}
 
 	return p.parseExprStmt()
@@ -483,6 +505,7 @@ func (p *Parser) parseLocalStmt() ast.Stmt {
 
 func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
 	p.expect(lexer.RETURN)
+	startToken := p.curr
 	p.read()
 
 	if p.curr.Kind == lexer.SEMICOLON {
@@ -495,42 +518,54 @@ func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
 	p.read()
 
 	return &ast.ReturnStmt{
+		StartToken: startToken,
+
 		Expr: expr,
 	}
 }
 
 func (p *Parser) parseContinueStmt() *ast.ContinueStmt {
 	p.expect(lexer.CONTINUE)
+	startToken := p.curr
 	p.read()
 
 	p.expect(lexer.SEMICOLON)
 	p.read()
 
-	return &ast.ContinueStmt{}
+	return &ast.ContinueStmt{
+		StartToken: startToken,
+	}
 }
 
 func (p *Parser) parseBreakStmt() *ast.BreakStmt {
 	p.expect(lexer.BREAK)
+	startToken := p.curr
 	p.read()
 
 	p.expect(lexer.SEMICOLON)
 	p.read()
 
-	return &ast.BreakStmt{}
+	return &ast.BreakStmt{
+		StartToken: startToken,
+	}
 }
 
 func (p *Parser) parseBreakAllStmt() *ast.BreakAllStmt {
 	p.expect(lexer.BREAKALL)
+	startToken := p.curr
 	p.read()
 
 	p.expect(lexer.SEMICOLON)
 	p.read()
 
-	return &ast.BreakAllStmt{}
+	return &ast.BreakAllStmt{
+		StartToken: startToken,
+	}
 }
 
 func (p *Parser) parseIfStmt() *ast.IfStmt {
 	p.expect(lexer.IF)
+	startToken := p.curr
 	p.read()
 
 	cond := p.parseParenExpr()
@@ -538,6 +573,8 @@ func (p *Parser) parseIfStmt() *ast.IfStmt {
 
 	if p.curr.Kind != lexer.ELSE {
 		return &ast.IfStmt{
+			StartToken: startToken,
+
 			Cond:   cond,
 			Body:   body,
 			Else:   nil,
@@ -547,12 +584,15 @@ func (p *Parser) parseIfStmt() *ast.IfStmt {
 
 	elseIfs := make([]ast.ElseIf, 0)
 	for p.scanner.HasTokens() && p.curr.Kind == lexer.ELSE {
+		startElseIfToken := p.curr
 		p.read()
 		if p.curr.Kind == lexer.IF {
 			p.read()
 			cond := p.parseParenExpr()
 			body := p.parseScopeStmt()
 			elseIfs = append(elseIfs, ast.ElseIf{
+				StartToken: startElseIfToken,
+
 				Cond: cond,
 				Body: body,
 			})
@@ -565,6 +605,8 @@ func (p *Parser) parseIfStmt() *ast.IfStmt {
 
 	if p.curr.Kind != lexer.ELSE {
 		return &ast.IfStmt{
+			StartToken: startToken,
+
 			Cond:   cond,
 			Body:   body,
 			Else:   nil,
@@ -577,6 +619,8 @@ func (p *Parser) parseIfStmt() *ast.IfStmt {
 	elseBody := p.parseScopeStmt()
 
 	return &ast.IfStmt{
+		StartToken: startToken,
+
 		Cond:   cond,
 		Body:   body,
 		Else:   elseBody,
@@ -586,17 +630,21 @@ func (p *Parser) parseIfStmt() *ast.IfStmt {
 
 func (p *Parser) parseLoopStmt() *ast.LoopStmt {
 	p.expect(lexer.LOOP)
+	startToken := p.curr
 	p.read()
 
 	body := p.parseScopeStmt()
 
 	return &ast.LoopStmt{
+		StartToken: startToken,
+
 		Body: body,
 	}
 }
 
 func (p *Parser) parseDoWhileStmt() *ast.DoWhileStmt {
 	p.expect(lexer.DO)
+	startToken := p.curr
 	p.read()
 
 	body := p.parseScopeStmt()
@@ -610,6 +658,8 @@ func (p *Parser) parseDoWhileStmt() *ast.DoWhileStmt {
 	p.read()
 
 	return &ast.DoWhileStmt{
+		StartToken: startToken,
+
 		Cond: cond,
 		Body: body,
 	}
@@ -617,12 +667,15 @@ func (p *Parser) parseDoWhileStmt() *ast.DoWhileStmt {
 
 func (p *Parser) parseWhileStmt() *ast.WhileStmt {
 	p.expect(lexer.WHILE)
+	startToken := p.curr
 	p.read()
 
 	cond := p.parseParenExpr()
 	body := p.parseScopeStmt()
 
 	return &ast.WhileStmt{
+		StartToken: startToken,
+
 		Cond: cond,
 		Body: body,
 	}
@@ -630,6 +683,7 @@ func (p *Parser) parseWhileStmt() *ast.WhileStmt {
 
 func (p *Parser) parseScopeStmt() *ast.ScopeStmt {
 	p.expect(lexer.LBRACE)
+	startToken := p.curr
 	p.read()
 
 	stmts := make([]ast.Stmt, 0)
@@ -641,14 +695,22 @@ func (p *Parser) parseScopeStmt() *ast.ScopeStmt {
 	p.read()
 
 	return &ast.ScopeStmt{
+		StartToken: startToken,
+
 		Stmts: stmts,
 	}
 }
 
-func (p *Parser) parseVarDeclStmt(static bool) *ast.VarDeclStmt {
+func (p *Parser) parseVarDeclStmt(
+	static bool,
+	startToken *lexer.Token,
+) *ast.VarDeclStmt {
 	var explicitType string
 
 	p.expectAny(lexer.LET, lexer.CONST)
+	if startToken == nil {
+		startToken = p.curr
+	}
 	isConst := p.curr.Kind == lexer.CONST
 
 	p.read()
@@ -734,10 +796,16 @@ func (p *Parser) parsePostfixExpr() ast.Expr {
 				p.unread()
 				right = p.parseCallExpr()
 			default:
-				right = &ast.IdentExpr{Value: memberName}
+				right = &ast.IdentExpr{
+					StartToken: p.curr,
+
+					Value: memberName,
+				}
 			}
 
 			expr = &ast.MemberAccessExpr{
+				StartToken: expr.FirstToken(),
+
 				Left:  expr,
 				Right: right,
 			}
@@ -750,6 +818,8 @@ func (p *Parser) parsePostfixExpr() ast.Expr {
 			p.read()
 
 			expr = &ast.ArraySubscriptExpr{
+				StartToken: expr.FirstToken(),
+
 				Left:  expr,
 				Index: indexExpr,
 			}
@@ -760,9 +830,11 @@ func (p *Parser) parsePostfixExpr() ast.Expr {
 				typeName := p.parseTypeIdentifier()
 
 				expr = &ast.CastExpr{
-					Left:     expr,
-					NewIdent: nil,
-					Type:     typeName,
+					StartToken: expr.FirstToken(),
+
+					Left:       expr,
+					NewIdent:   nil,
+					CastToType: typeName,
 				}
 				continue
 			}
@@ -781,9 +853,11 @@ func (p *Parser) parsePostfixExpr() ast.Expr {
 			p.read()
 
 			expr = &ast.CastExpr{
-				Left:     expr,
-				NewIdent: newIdent,
-				Type:     typeName,
+				StartToken: expr.FirstToken(),
+
+				Left:       expr,
+				NewIdent:   newIdent,
+				CastToType: typeName,
 			}
 		}
 	}
@@ -845,6 +919,8 @@ func (p *Parser) parseAssignExpr() ast.Expr {
 	value := p.parseExpr()
 
 	return &ast.AssignExpr{
+		StartToken: ident.FirstToken(),
+
 		Ident: ident,
 		Op:    op,
 		Value: value,
@@ -880,6 +956,8 @@ func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
 		}
 
 		left = &ast.BinaryExpr{
+			StartToken: left.FirstToken(),
+
 			Left:  left,
 			Op:    op,
 			Right: right,
@@ -889,6 +967,7 @@ func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
 
 func (p *Parser) parseCallExpr() *ast.CallExpr {
 	p.expect(lexer.IDENT)
+	startToken := p.curr
 	name := p.curr.Value
 	p.read()
 
@@ -907,6 +986,8 @@ func (p *Parser) parseCallExpr() *ast.CallExpr {
 	p.read()
 
 	return &ast.CallExpr{
+		StartToken: startToken,
+
 		Name: name,
 		Args: args,
 	}
@@ -915,10 +996,13 @@ func (p *Parser) parseCallExpr() *ast.CallExpr {
 func (p *Parser) parseIdentExpr() *ast.IdentExpr {
 	p.expect(lexer.IDENT)
 
+	startToken := p.curr
 	ident := p.curr.Value
 	p.read()
 
 	return &ast.IdentExpr{
+		StartToken: startToken,
+
 		Value: ident,
 	}
 }
@@ -943,6 +1027,7 @@ func (p *Parser) parseLiteralExpr() ast.Expr {
 
 func (p *Parser) parseIntegerExpr() *ast.IntExpr {
 	p.expect(lexer.INT)
+	startToken := p.curr
 
 	int, err := strconv.ParseInt(p.curr.Value, 10, 64)
 	if err != nil {
@@ -952,12 +1037,15 @@ func (p *Parser) parseIntegerExpr() *ast.IntExpr {
 	p.read()
 
 	return &ast.IntExpr{
+		StartToken: startToken,
+
 		Value: int,
 	}
 }
 
 func (p *Parser) parseFloatExpr() *ast.FloatExpr {
 	p.expect(lexer.FLOAT)
+	startToken := p.curr
 
 	float, err := strconv.ParseFloat(p.curr.Value, 64)
 	if err != nil {
@@ -967,12 +1055,15 @@ func (p *Parser) parseFloatExpr() *ast.FloatExpr {
 	p.read()
 
 	return &ast.FloatExpr{
+		StartToken: startToken,
+
 		Value: float,
 	}
 }
 
 func (p *Parser) parseBoolExpr() *ast.BoolExpr {
 	p.expect(lexer.BOOL)
+	startToken := p.curr
 
 	bool, err := strconv.ParseBool(p.curr.Value)
 	if err != nil {
@@ -982,36 +1073,44 @@ func (p *Parser) parseBoolExpr() *ast.BoolExpr {
 	p.read()
 
 	return &ast.BoolExpr{
+		StartToken: startToken,
+
 		Value: bool,
 	}
 }
 
 func (p *Parser) parseCharExpr() *ast.CharExpr {
 	p.expect(lexer.CHAR)
+	startToken := p.curr
 
 	byte := p.curr.Value[0]
 	p.read()
 
 	return &ast.CharExpr{
+		StartToken: startToken,
+
 		Value: byte,
 	}
 }
 
 func (p *Parser) parseStringExpr() *ast.StringExpr {
 	p.expect(lexer.STRING)
+	startToken := p.curr
 	p.read()
 
 	return &ast.StringExpr{
+		StartToken: startToken,
+
 		Value: p.curr.Value,
 	}
 }
 
-func (p *Parser) read() lexer.Token {
+func (p *Parser) read() *lexer.Token {
 	p.curr = p.scanner.Read()
 	return p.curr
 }
 
-func (p *Parser) unread() lexer.Token {
+func (p *Parser) unread() *lexer.Token {
 	p.curr = p.scanner.Unread()
 	return p.curr
 }
