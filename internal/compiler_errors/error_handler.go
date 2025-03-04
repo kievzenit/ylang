@@ -17,6 +17,7 @@ type CompilerError interface {
 type ErrorHandler interface {
 	AddError(err CompilerError)
 	FailNow()
+	FailIfAnyError()
 }
 
 type CompilerErrorHandler struct {
@@ -46,4 +47,10 @@ func (eh *CompilerErrorHandler) FailNow() {
 	}
 
 	os.Exit(1)
+}
+
+func (eh *CompilerErrorHandler) FailIfAnyError() {
+	if len(eh.errors) > 0 {
+		eh.FailNow()
+	}
 }
