@@ -88,8 +88,8 @@ func NewLexer(fileName string, buf []byte, eh compiler_errors.ErrorHandler) *Lex
 	}
 }
 
-func (l *Lexer) Tokenize() []Token {
-	tokens := make([]Token, 0)
+func (l *Lexer) Tokenize() []*Token {
+	tokens := make([]*Token, 0)
 
 	for l.hasChars() {
 		switch {
@@ -128,13 +128,14 @@ func (l *Lexer) Tokenize() []Token {
 		l.advance()
 	}
 
-	tokens = append(tokens, Token{
+	tokens = append(tokens, &Token{
 		Kind:  EOF,
 		Value: EOF.String(),
 		Metadata: TokenMetadata{
-			Line:   l.line + 1,
-			Length: 0,
-			Column: 0,
+			FileName: l.fileName,
+			Line:     l.line + 1,
+			Length:   0,
+			Column:   0,
 		},
 	})
 
@@ -174,7 +175,7 @@ func (l *Lexer) isCurrSkippable() bool {
 	return false
 }
 
-func (l *Lexer) processIdentifier() Token {
+func (l *Lexer) processIdentifier() *Token {
 	columnStart := l.col
 
 	identifierBuf := make([]byte, 0)
@@ -194,259 +195,284 @@ func (l *Lexer) processIdentifier() Token {
 
 	switch identifier {
 	case "package":
-		return Token{
+		return &Token{
 			Kind:  PACKAGE,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "export":
-		return Token{
+		return &Token{
 			Kind:  EXPORT,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "extern":
-		return Token{
+		return &Token{
 			Kind:  EXTERN,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "static":
-		return Token{
+		return &Token{
 			Kind:  STATIC,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "type":
-		return Token{
+		return &Token{
 			Kind:  TYPE,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "public":
-		return Token{
+		return &Token{
 			Kind:  PUBLIC,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "private":
-		return Token{
+		return &Token{
 			Kind:  PRIVATE,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "ctor":
-		return Token{
+		return &Token{
 			Kind:  CTOR,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "dtor":
-		return Token{
+		return &Token{
 			Kind:  DTOR,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "fun":
-		return Token{
+		return &Token{
 			Kind:  FUN,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "let":
-		return Token{
+		return &Token{
 			Kind:  LET,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "const":
-		return Token{
+		return &Token{
 			Kind:  CONST,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "loop":
-		return Token{
+		return &Token{
 			Kind:  LOOP,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "while":
-		return Token{
+		return &Token{
 			Kind:  WHILE,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "do":
-		return Token{
+		return &Token{
 			Kind:  DO,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "for":
-		return Token{
+		return &Token{
 			Kind:  FOR,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "if":
-		return Token{
+		return &Token{
 			Kind:  IF,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "else":
-		return Token{
+		return &Token{
 			Kind:  ELSE,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "continue":
-		return Token{
+		return &Token{
 			Kind:  CONTINUE,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "break":
-		return Token{
+		return &Token{
 			Kind:  BREAK,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "breakall":
-		return Token{
+		return &Token{
 			Kind:  BREAKALL,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "return":
-		return Token{
+		return &Token{
 			Kind:  RETURN,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "true":
-		return Token{
+		return &Token{
 			Kind:  BOOL,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case "false":
-		return Token{
+		return &Token{
 			Kind:  BOOL,
 			Value: identifier,
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
-	return Token{
+	return &Token{
 		Kind:  IDENT,
 		Value: identifier,
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processNumber() Token {
+func (l *Lexer) processNumber() *Token {
 	columnStart := l.col
 
 	numberBuf := make([]byte, 0)
@@ -484,29 +510,31 @@ func (l *Lexer) processNumber() Token {
 	}
 
 	if isFloat {
-		return Token{
+		return &Token{
 			Kind:  FLOAT,
 			Value: string(numberBuf),
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
-	return Token{
+	return &Token{
 		Kind:  INT,
 		Value: string(numberBuf),
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processStringLiteral() Token {
+func (l *Lexer) processStringLiteral() *Token {
 	columnStart := l.col
 
 	l.advance()
@@ -533,18 +561,19 @@ func (l *Lexer) processStringLiteral() Token {
 		l.eh.FailNow()
 	}
 
-	return Token{
+	return &Token{
 		Kind:  STRING,
 		Value: string(stringBuf),
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processCharLiteral() Token {
+func (l *Lexer) processCharLiteral() *Token {
 	columnStart := l.col
 
 	var char byte
@@ -567,161 +596,173 @@ func (l *Lexer) processCharLiteral() Token {
 		l.eh.FailNow()
 	}
 
-	return Token{
+	return &Token{
 		Kind:  CHAR,
 		Value: string(char),
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processPlus() Token {
+func (l *Lexer) processPlus() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  PLUS,
 			Value: "+",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '+' {
-		return Token{
+		return &Token{
 			Kind:  INC,
 			Value: "++",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  ADD_ASSIGN,
 			Value: "+=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  PLUS,
 		Value: "+",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processMinus() Token {
+func (l *Lexer) processMinus() *Token {
 	columnStart := l.col
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  MINUS,
 			Value: "-",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '-' {
-		return Token{
+		return &Token{
 			Kind:  DEC,
 			Value: "--",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  SUB_ASSIGN,
 			Value: "-=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  MINUS,
 		Value: "-",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processAsterisk() Token {
+func (l *Lexer) processAsterisk() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  ASTERISK,
 			Value: "*",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  MUL_ASSIGN,
 			Value: "*=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  ASTERISK,
 		Value: "*",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processOneLineComment() Token {
+func (l *Lexer) processOneLineComment() *Token {
 	columnStart := l.col
 
 	content := make([]byte, 0)
@@ -736,18 +777,19 @@ func (l *Lexer) processOneLineComment() Token {
 		l.advance()
 	}
 
-	return Token{
+	return &Token{
 		Kind:  ONELINE_COMMENT,
 		Value: string(content),
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processMultiLineComment() Token {
+func (l *Lexer) processMultiLineComment() *Token {
 	columnStart := l.col
 
 	content := make([]byte, 0)
@@ -776,41 +818,44 @@ func (l *Lexer) processMultiLineComment() Token {
 		l.advance()
 	}
 
-	return Token{
+	return &Token{
 		Kind:  MULTILINE_COMMENT,
 		Value: string(content),
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processSlash() Token {
+func (l *Lexer) processSlash() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  SLASH,
 			Value: "/",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  DIV_ASSIGN,
 			Value: "/=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
@@ -824,252 +869,271 @@ func (l *Lexer) processSlash() Token {
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  SLASH,
 		Value: "/",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processPercent() Token {
+func (l *Lexer) processPercent() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  PERCENT,
 			Value: "%",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  MOD_ASSIGN,
 			Value: "%=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  PERCENT,
 		Value: "%",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processEquals() Token {
+func (l *Lexer) processEquals() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  ASSIGN,
 			Value: "=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  EQ,
 			Value: "==",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  ASSIGN,
 		Value: "=",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processAmpersand() Token {
+func (l *Lexer) processAmpersand() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  BAND,
 			Value: "&",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '&' {
-		return Token{
+		return &Token{
 			Kind:  LAND,
 			Value: "&&",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  BAND_ASSIGN,
 			Value: "&=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  BAND,
 		Value: "&",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
-func (l *Lexer) processCaret() Token {
+func (l *Lexer) processCaret() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  XOR,
 			Value: "^",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  XOR_ASSIGN,
 			Value: "^=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  XOR,
 		Value: "^",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processPipe() Token {
+func (l *Lexer) processPipe() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  BOR,
 			Value: "|",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '|' {
-		return Token{
+		return &Token{
 			Kind:  LOR,
 			Value: "||",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  BOR_ASSIGN,
 			Value: "|=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  BOR,
 		Value: "|",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processGreaterThan() Token {
+func (l *Lexer) processGreaterThan() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  GT,
 			Value: ">",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
@@ -1077,76 +1141,82 @@ func (l *Lexer) processGreaterThan() Token {
 	if l.read() == '>' {
 		if l.hasChars() && l.next() == '=' {
 			l.advance()
-			return Token{
+			return &Token{
 				Kind:  SHR_ASSIGN,
 				Value: ">>=",
 				Metadata: TokenMetadata{
-					Line:   l.line,
-					Length: l.col - columnStart + 1,
-					Column: columnStart,
+					FileName: l.fileName,
+					Line:     l.line,
+					Length:   l.col - columnStart + 1,
+					Column:   columnStart,
 				},
 			}
 		}
 
-		return Token{
+		return &Token{
 			Kind:  SHR,
 			Value: ">>",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  GEQ,
 			Value: ">=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '-' {
-		return Token{
+		return &Token{
 			Kind:  CAST,
 			Value: ">-",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  GT,
 		Value: ">",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processLessThan() Token {
+func (l *Lexer) processLessThan() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  LT,
 			Value: "<",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
@@ -1154,133 +1224,143 @@ func (l *Lexer) processLessThan() Token {
 	if l.read() == '<' {
 		if l.hasChars() && l.next() == '=' {
 			l.advance()
-			return Token{
+			return &Token{
 				Kind:  SHL_ASSIGN,
 				Value: "<<=",
 				Metadata: TokenMetadata{
-					Line:   l.line,
-					Length: l.col - columnStart + 1,
-					Column: columnStart,
+					FileName: l.fileName,
+					Line:     l.line,
+					Length:   l.col - columnStart + 1,
+					Column:   columnStart,
 				},
 			}
 		}
 
-		return Token{
+		return &Token{
 			Kind:  SHL,
 			Value: "<<",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  LEQ,
 			Value: "<=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  LT,
 		Value: "<",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processColon() Token {
+func (l *Lexer) processColon() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  COLON,
 			Value: ":",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == ':' {
-		return Token{
+		return &Token{
 			Kind:  COLONCOLON,
 			Value: "::",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  COLON,
 		Value: ":",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processExclamationMark() Token {
+func (l *Lexer) processExclamationMark() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() {
-		return Token{
+		return &Token{
 			Kind:  XMARK,
 			Value: "!",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	if l.read() == '=' {
-		return Token{
+		return &Token{
 			Kind:  NEQ,
 			Value: "!=",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
 	l.unread()
-	return Token{
+	return &Token{
 		Kind:  XMARK,
 		Value: "!",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
 
-func (l *Lexer) processPunctuation() Token {
+func (l *Lexer) processPunctuation() *Token {
 	columnStart := l.col
 
 	switch l.read() {
@@ -1307,99 +1387,108 @@ func (l *Lexer) processPunctuation() Token {
 	case '<':
 		return l.processLessThan()
 	case '(':
-		return Token{
+		return &Token{
 			Kind:  LPAREN,
 			Value: "(",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case '[':
-		return Token{
+		return &Token{
 			Kind:  LBRACKET,
 			Value: "[",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case '{':
-		return Token{
+		return &Token{
 			Kind:  LBRACE,
 			Value: "{",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case ')':
-		return Token{
+		return &Token{
 			Kind:  RPAREN,
 			Value: ")",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case ']':
-		return Token{
+		return &Token{
 			Kind:  RBRACKET,
 			Value: "]",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case '}':
-		return Token{
+		return &Token{
 			Kind:  RBRACE,
 			Value: "}",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case ':':
 		return l.processColon()
 	case ';':
-		return Token{
+		return &Token{
 			Kind:  SEMICOLON,
 			Value: ";",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case '.':
 		return l.processDot()
 	case ',':
-		return Token{
+		return &Token{
 			Kind:  COMMA,
 			Value: ",",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	case '!':
 		return l.processExclamationMark()
 	case '?':
-		return Token{
+		return &Token{
 			Kind:  QMARK,
 			Value: "?",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
@@ -1407,19 +1496,20 @@ func (l *Lexer) processPunctuation() Token {
 	panic("unreachable")
 }
 
-func (l *Lexer) processDot() Token {
+func (l *Lexer) processDot() *Token {
 	columnStart := l.col
 
 	l.advance()
 	if !l.hasChars() || l.read() != '.' {
 		l.unread()
-		return Token{
+		return &Token{
 			Kind:  DOT,
 			Value: ".",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
@@ -1427,24 +1517,26 @@ func (l *Lexer) processDot() Token {
 	l.advance()
 	if !l.hasChars() || l.read() != '.' {
 		l.unread()
-		return Token{
+		return &Token{
 			Kind:  RANGE,
 			Value: "..",
 			Metadata: TokenMetadata{
-				Line:   l.line,
-				Length: l.col - columnStart + 1,
-				Column: columnStart,
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
 			},
 		}
 	}
 
-	return Token{
+	return &Token{
 		Kind:  ELLIPSIS,
 		Value: "...",
 		Metadata: TokenMetadata{
-			Line:   l.line,
-			Length: l.col - columnStart + 1,
-			Column: columnStart,
+			FileName: l.fileName,
+			Line:     l.line,
+			Length:   l.col - columnStart + 1,
+			Column:   columnStart,
 		},
 	}
 }
