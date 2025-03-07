@@ -732,6 +732,8 @@ func (p *Parser) parseVarDeclStmt(
 	p.read()
 
 	return &ast.VarDeclStmt{
+		StartToken: startToken,
+
 		Name:         varName,
 		ExplicitType: explicitType,
 		Value:        expr,

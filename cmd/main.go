@@ -8,6 +8,7 @@ import (
 	"github.com/kievzenit/ylang/internal/compiler_errors"
 	l "github.com/kievzenit/ylang/internal/lexer"
 	"github.com/kievzenit/ylang/internal/parser"
+	"github.com/kievzenit/ylang/internal/semantic_analyzer"
 	"github.com/sanity-io/litter"
 )
 
@@ -29,7 +30,7 @@ func main() {
 
 	lexer := l.NewLexer(absoluteFileName, fileData, eh)
 	tokens := lexer.Tokenize()
-	sanitizedTokens := make([]l.Token, 0)
+	sanitizedTokens := make([]*l.Token, 0)
 	for _, token := range tokens {
 		if token.Kind == l.ONELINE_COMMENT || token.Kind == l.MULTILINE_COMMENT {
 			continue
@@ -43,4 +44,9 @@ func main() {
 	parser := parser.NewParser(absoluteFileName, scanner, eh)
 	translationUnit := parser.Parse()
 	litter.Dump(translationUnit)
+
+	semanticAnalyzer := semantic_analyzer.NewSemanticAnalyzer(eh, translationUnit)
+	fileHir := semanticAnalyzer.Analyze()
+	eh.FailIfAnyError()
+	_ = fileHir
 }
