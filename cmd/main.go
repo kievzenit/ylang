@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/kievzenit/ylang/internal/compiler_errors"
+	"github.com/kievzenit/ylang/internal/emitter"
 	l "github.com/kievzenit/ylang/internal/lexer"
 	"github.com/kievzenit/ylang/internal/parser"
 	"github.com/kievzenit/ylang/internal/semantic_analyzer"
@@ -48,5 +49,8 @@ func main() {
 	semanticAnalyzer := semantic_analyzer.NewSemanticAnalyzer(eh, translationUnit)
 	fileHir := semanticAnalyzer.Analyze()
 	eh.FailIfAnyError()
-	_ = fileHir
+
+	emitter := emitter.NewEmitter(fileHir)
+	module := emitter.Emit()
+	module.Dump()
 }
