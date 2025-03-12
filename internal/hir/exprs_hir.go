@@ -40,6 +40,12 @@ type IdentExprHir struct {
 	Name string
 }
 
+type ArgIdentExprHir struct {
+	types.Type
+	Name  string
+	Index int
+}
+
 type AssignExprHir struct {
 	types.Type
 	Ident *IdentExprHir
@@ -127,20 +133,22 @@ type BinaryExprHir struct {
 	Right ExprHir
 }
 
-func (BoolExprHir) ExprHirNode()   {}
-func (IntExprHir) ExprHirNode()    {}
-func (FloatExprHir) ExprHirNode()  {}
-func (IdentExprHir) ExprHirNode()  {}
-func (AssignExprHir) ExprHirNode() {}
-func (CallExprHir) ExprHirNode()   {}
-func (CastExprHir) ExprHirNode()   {}
-func (BinaryExprHir) ExprHirNode() {}
+func (BoolExprHir) ExprHirNode()     {}
+func (IntExprHir) ExprHirNode()      {}
+func (FloatExprHir) ExprHirNode()    {}
+func (IdentExprHir) ExprHirNode()    {}
+func (ArgIdentExprHir) ExprHirNode() {}
+func (AssignExprHir) ExprHirNode()   {}
+func (CallExprHir) ExprHirNode()     {}
+func (CastExprHir) ExprHirNode()     {}
+func (BinaryExprHir) ExprHirNode()   {}
 
-func (e BoolExprHir) ExprType() types.Type   { return e.Type }
-func (e IntExprHir) ExprType() types.Type    { return e.Type }
-func (e FloatExprHir) ExprType() types.Type  { return e.Type }
-func (e IdentExprHir) ExprType() types.Type  { return e.Type }
-func (e AssignExprHir) ExprType() types.Type { return e.Type }
-func (e CallExprHir) ExprType() types.Type   { return e.Type }
-func (e CastExprHir) ExprType() types.Type   { return e.NewType }
-func (e BinaryExprHir) ExprType() types.Type { return e.Type }
+func (e BoolExprHir) ExprType() types.Type     { return e.Type }
+func (e IntExprHir) ExprType() types.Type      { return e.Type }
+func (e FloatExprHir) ExprType() types.Type    { return e.Type }
+func (e IdentExprHir) ExprType() types.Type    { return e.Type }
+func (e ArgIdentExprHir) ExprType() types.Type { return e.Type }
+func (e AssignExprHir) ExprType() types.Type   { return e.Type }
+func (e CallExprHir) ExprType() types.Type     { return e.Type }
+func (e CastExprHir) ExprType() types.Type     { return e.NewType }
+func (e BinaryExprHir) ExprType() types.Type   { return e.Type }

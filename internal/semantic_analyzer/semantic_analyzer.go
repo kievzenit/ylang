@@ -69,11 +69,18 @@ func (s *scope) defineVar(name string, v varDefinition) {
 	s.variables[name] = v
 }
 
+type argDefinition struct {
+	Type  types.Type
+	Index int
+}
+
 type SemanticAnalyzer struct {
 	eh              compiler_errors.ErrorHandler
 	translationUnit ast.TranslationUnit
 
 	scope    *scope
+	funcArgs map[string]argDefinition
+
 	typesMap map[string]types.Type
 	funcsMap map[string]types.FunctionType
 }
@@ -86,6 +93,8 @@ func NewSemanticAnalyzer(
 		translationUnit: translationUnit,
 
 		scope:    &scope{variables: make(map[string]varDefinition)},
+		funcArgs: make(map[string]argDefinition),
+
 		typesMap: make(map[string]types.Type),
 		funcsMap: make(map[string]types.FunctionType),
 	}
@@ -221,14 +230,33 @@ func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt) 
 	}
 
 	functionType := sa.funcsMap[funcDeclStmt.Name]
-	for _, arg := range functionType.Args {
-		sa.scope.defineVar(arg.Name, varDefinition{
-			Const: false,
+	for i, arg := range functionType.Args {
+		sa.funcArgs[arg.Name] = argDefinition{
 			Type:  arg.Type,
-		})
+			Index: i,
+		}
 	}
 
 	funcScope := sa.analyzeScopeStmt(funcDeclStmt.Body)
+
+	lastStmt := funcScope.Stmts[len(funcScope.Stmts)-1]
+	if _, ok := lastStmt.(*hir.ReturnStmtHir); !ok {
+		if functionType.ReturnType != sa.typesMap["void"] {
+			sa.eh.AddError(
+				newSemanticError(
+					"function must return a value",
+					funcDeclStmt.StartToken.Metadata.FileName,
+					funcDeclStmt.StartToken.Metadata.Line,
+					funcDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		funcScope.Stmts = append(funcScope.Stmts, &hir.ReturnStmtHir{Expr: nil})
+	}
+
+	sa.funcArgs = make(map[string]argDefinition)
 
 	return &hir.FuncDeclStmtHir{
 		FunctionType: functionType,
@@ -276,6 +304,18 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 		)
 		return nil
 	}
+	_, defined = sa.funcArgs[varDeclStmt.Name]
+	if defined {
+		sa.eh.AddError(
+			newSemanticError(
+				fmt.Sprintf("variable %s shadows function argument", varDeclStmt.Name),
+				varDeclStmt.StartToken.Metadata.FileName,
+				varDeclStmt.StartToken.Metadata.Line,
+				varDeclStmt.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
 
 	valueExpr := sa.analyzeExpr(varDeclStmt.Value)
 	if hir.IsNilExpr(valueExpr) {
@@ -300,6 +340,7 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 
 	return &hir.VarDeclStmtHir{
 		Type:  varDef.Type,
+		Name:  varDeclStmt.Name,
 		Value: valueExpr,
 	}
 }
@@ -363,12 +404,25 @@ func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.B
 func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.AssignExprHir {
 	varDef, defined := sa.scope.lookupVar(assignExpr.Ident.Value)
 	if !defined {
+		_, defined := sa.funcArgs[assignExpr.Ident.Value]
+		if !defined {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("variable %s not defined", assignExpr.Ident.Value),
+					assignExpr.StartToken.Metadata.FileName,
+					assignExpr.StartToken.Metadata.Line,
+					assignExpr.StartToken.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
 		sa.eh.AddError(
 			newSemanticError(
-				fmt.Sprintf("variable %s not defined", assignExpr.Ident.Value),
-				assignExpr.StartToken.Metadata.FileName,
-				assignExpr.StartToken.Metadata.Line,
-				assignExpr.StartToken.Metadata.Column,
+				"cannot assign to a function argument",
+				assignExpr.Op.Metadata.FileName,
+				assignExpr.Op.Metadata.Line,
+				assignExpr.Op.Metadata.Column,
 			),
 		)
 		return nil
@@ -533,18 +587,27 @@ func (sa *SemanticAnalyzer) analyzeCallExpr(callExpr *ast.CallExpr) *hir.CallExp
 	}
 }
 
-func (sa *SemanticAnalyzer) analyzeIdentExpr(identExpr *ast.IdentExpr) *hir.IdentExprHir {
+func (sa *SemanticAnalyzer) analyzeIdentExpr(identExpr *ast.IdentExpr) hir.ExprHir {
 	varDef, defined := sa.scope.lookupVar(identExpr.Value)
 	if !defined {
-		sa.eh.AddError(
-			newSemanticError(
-				fmt.Sprintf("variable %s not defined", identExpr.Value),
-				identExpr.StartToken.Metadata.FileName,
-				identExpr.StartToken.Metadata.Line,
-				identExpr.StartToken.Metadata.Column,
-			),
-		)
-		return nil
+		arfDef, defined := sa.funcArgs[identExpr.Value]
+		if !defined {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("variable %s not defined", identExpr.Value),
+					identExpr.StartToken.Metadata.FileName,
+					identExpr.StartToken.Metadata.Line,
+					identExpr.StartToken.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.ArgIdentExprHir{
+			Type:  arfDef.Type,
+			Name:  identExpr.Value,
+			Index: arfDef.Index,
+		}
 	}
 
 	return &hir.IdentExprHir{
