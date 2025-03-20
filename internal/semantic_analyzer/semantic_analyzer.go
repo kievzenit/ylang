@@ -224,6 +224,18 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFunctions() {
 						),
 					)
 				}
+
+				if argType == sa.typesMap["void"] {
+					sa.eh.AddError(
+						newSemanticError(
+							"argument cannot be of type void",
+							"",
+							0,
+							0,
+						),
+					)
+				}
+
 				args = append(args, types.FunctionArgType{
 					Name: arg.Name,
 					Type: argType,
@@ -417,7 +429,20 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 			return nil
 		}
 
+		if varExplicitType == sa.typesMap["void"] {
+			sa.eh.AddError(
+				newSemanticError(
+					"variable cannot be of type void",
+					varDeclStmt.StartToken.Metadata.FileName,
+					varDeclStmt.StartToken.Metadata.Line,
+					varDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
 		valueExpr = sa.tryImplicitCast(valueExpr, varExplicitType)
+
 		if varExplicitType != valueExpr.ExprType() {
 			sa.eh.AddError(
 				newSemanticError(
