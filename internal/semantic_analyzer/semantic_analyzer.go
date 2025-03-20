@@ -124,14 +124,69 @@ func (sa *SemanticAnalyzer) Analyze() *hir.FileHir {
 }
 
 func (sa *SemanticAnalyzer) defineBuiltInTypes() {
+	sa.typesMap["bool"] = &types.BoolType{}
+
+	sa.typesMap["i8"] = &types.IntType{
+		Signed: true,
+		Bits:   8,
+	}
+	sa.typesMap["i16"] = &types.IntType{
+		Signed: true,
+		Bits:   16,
+	}
 	sa.typesMap["i32"] = &types.IntType{
 		Signed: true,
 		Bits:   32,
 	}
-	sa.typesMap["f16"] = &types.FloatType{
-		Bits: 16,
+	sa.typesMap["i64"] = &types.IntType{
+		Signed: true,
+		Bits:   64,
 	}
-	sa.typesMap["bool"] = &types.BoolType{}
+	sa.typesMap["i128"] = &types.IntType{
+		Signed: true,
+		Bits:   128,
+	}
+	sa.typesMap["u1"] = &types.IntType{
+		Signed: false,
+		Bits:   1,
+	}
+	sa.typesMap["u8"] = &types.IntType{
+		Signed: false,
+		Bits:   8,
+	}
+	sa.typesMap["u16"] = &types.IntType{
+		Signed: false,
+		Bits:   16,
+	}
+	sa.typesMap["u32"] = &types.IntType{
+		Signed: false,
+		Bits:   32,
+	}
+	sa.typesMap["u64"] = &types.IntType{
+		Signed: false,
+		Bits:   64,
+	}
+	sa.typesMap["u128"] = &types.IntType{
+		Signed: false,
+		Bits:   128,
+	}
+
+	// sa.typesMap["f16"] = &types.FloatType{
+	// 	Bits: 16,
+	// }
+	sa.typesMap["f32"] = &types.FloatType{
+		Bits: 32,
+	}
+	sa.typesMap["f64"] = &types.FloatType{
+		Bits: 64,
+	}
+	sa.typesMap["f80"] = &types.FloatType{
+		Bits: 80,
+	}
+	sa.typesMap["f128"] = &types.FloatType{
+		Bits: 128,
+	}
+
 	sa.typesMap["void"] = &types.VoidType{}
 }
 
@@ -237,9 +292,23 @@ func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt) 
 		}
 	}
 
+	if funcDeclStmt.Body == nil {
+		sa.eh.AddError(
+			newSemanticError(
+				"function must have a body",
+				funcDeclStmt.StartToken.Metadata.FileName,
+				funcDeclStmt.StartToken.Metadata.Line,
+				funcDeclStmt.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
 	funcScope := sa.analyzeScopeStmt(funcDeclStmt.Body)
 
-	lastStmt := funcScope.Stmts[len(funcScope.Stmts)-1]
+	var lastStmt hir.StmtHir
+	if len(funcScope.Stmts) != 0 {
+		lastStmt = funcScope.Stmts[len(funcScope.Stmts)-1]
+	}
 	if _, ok := lastStmt.(*hir.ReturnStmtHir); !ok {
 		if functionType.ReturnType != sa.typesMap["void"] {
 			sa.eh.AddError(
@@ -333,6 +402,35 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 		)
 		return nil
 	}
+
+	if varDeclStmt.ExplicitType != "" {
+		varExplicitType, ok := sa.typesMap[varDeclStmt.ExplicitType]
+		if !ok {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("type %s not defined", varDeclStmt.ExplicitType),
+					varDeclStmt.StartToken.Metadata.FileName,
+					varDeclStmt.StartToken.Metadata.Line,
+					varDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		valueExpr = sa.tryImplicitCast(valueExpr, varExplicitType)
+		if varExplicitType != valueExpr.ExprType() {
+			sa.eh.AddError(
+				newSemanticError(
+					"variable type mismatch",
+					varDeclStmt.StartToken.Metadata.FileName,
+					varDeclStmt.StartToken.Metadata.Line,
+					varDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			return nil
+		}
+	}
+
 	sa.scope.defineVar(varDeclStmt.Name, varDefinition{
 		Const: varDeclStmt.Const,
 		Type:  valueExpr.ExprType(),
@@ -368,9 +466,27 @@ func (sa *SemanticAnalyzer) analyzeExpr(expr ast.Expr) hir.ExprHir {
 		return sa.analyzeFloatExpr(expr.(*ast.FloatExpr))
 	case *ast.BoolExpr:
 		return sa.analyzeBoolExpr(expr.(*ast.BoolExpr))
+	case *ast.CastExpr:
+		return sa.analyzeCastExpr(expr.(*ast.CastExpr))
 	default:
 		panic("not implemented")
 	}
+}
+
+func (sa *SemanticAnalyzer) tryImplicitCast(exprHir hir.ExprHir, hirType types.Type) hir.ExprHir {
+	if exprHir.ExprType() == hirType {
+		return exprHir
+	}
+
+	if exprHir.ExprType().CanBeImplicitlyCastedTo(hirType) {
+		return &hir.UpCastExprHir{
+			NewType: hirType,
+			OldType: exprHir.ExprType(),
+			Expr:    exprHir,
+		}
+	}
+
+	return exprHir
 }
 
 func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.BinaryExprHir {
@@ -381,6 +497,8 @@ func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.B
 		return nil
 	}
 
+	left = sa.tryImplicitCast(left, right.ExprType())
+	right = sa.tryImplicitCast(right, left.ExprType())
 	if left.ExprType() != right.ExprType() {
 		sa.eh.AddError(
 			newSemanticError(
@@ -446,6 +564,7 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 		return nil
 	}
 
+	expr = sa.tryImplicitCast(expr, varDef.Type)
 	if varDef.Type != expr.ExprType() {
 		sa.eh.AddError(
 			newSemanticError(
@@ -565,6 +684,7 @@ func (sa *SemanticAnalyzer) analyzeCallExpr(callExpr *ast.CallExpr) *hir.CallExp
 		}
 
 		argType := funcType.Args[i].Type
+		argExpr = sa.tryImplicitCast(argExpr, argType)
 		if argType != argExpr.ExprType() {
 			sa.eh.AddError(
 				newSemanticError(
@@ -617,15 +737,29 @@ func (sa *SemanticAnalyzer) analyzeIdentExpr(identExpr *ast.IdentExpr) hir.ExprH
 }
 
 func (sa *SemanticAnalyzer) analyzeIntExpr(intExpr *ast.IntExpr) *hir.IntExprHir {
+	if intExpr.ExplicitType == "" {
+		return &hir.IntExprHir{
+			Type:  sa.typesMap["i32"],
+			Value: intExpr.Value,
+		}
+	}
+
 	return &hir.IntExprHir{
-		Type:  sa.typesMap["i32"],
+		Type:  sa.typesMap[string(intExpr.ExplicitType)],
 		Value: intExpr.Value,
 	}
 }
 
 func (sa *SemanticAnalyzer) analyzeFloatExpr(floatExpr *ast.FloatExpr) *hir.FloatExprHir {
+	if floatExpr.ExplicitType == ast.FloatNone {
+		return &hir.FloatExprHir{
+			Type:  sa.typesMap["f32"],
+			Value: floatExpr.Value,
+		}
+	}
+
 	return &hir.FloatExprHir{
-		Type:  sa.typesMap["f16"],
+		Type:  sa.typesMap[string(floatExpr.ExplicitType)],
 		Value: floatExpr.Value,
 	}
 }
@@ -635,4 +769,93 @@ func (sa *SemanticAnalyzer) analyzeBoolExpr(boolExpr *ast.BoolExpr) *hir.BoolExp
 		Type:  sa.typesMap["bool"],
 		Value: boolExpr.Value,
 	}
+}
+
+func (sa *SemanticAnalyzer) analyzeCastExpr(castExpr *ast.CastExpr) hir.ExprHir {
+	left := sa.analyzeExpr(castExpr.Left)
+	if hir.IsNilExpr(left) {
+		return nil
+	}
+
+	newType, ok := sa.typesMap[castExpr.CastToType]
+	if !ok {
+		sa.eh.AddError(
+			newSemanticError(
+				fmt.Sprintf("type %s not defined", castExpr.CastToType),
+				castExpr.StartToken.Metadata.FileName,
+				castExpr.StartToken.Metadata.Line,
+				castExpr.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	left = sa.tryImplicitCast(left, newType)
+	if left.ExprType() == newType {
+		return left
+	}
+
+	if !left.ExprType().CanBeExplicitlyCastedTo(newType) {
+		sa.eh.AddError(
+			newSemanticError(
+				"cannot cast",
+				castExpr.StartToken.Metadata.FileName,
+				castExpr.StartToken.Metadata.Line,
+				castExpr.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	// TODO: fix this
+	newIntType, ok := newType.(*types.IntType)
+	if ok {
+		leftIntType, ok := left.ExprType().(*types.IntType)
+		if ok {
+			if leftIntType.Bits < newIntType.Bits {
+				return &hir.UpCastExprHir{
+					Expr:    left,
+					OldType: left.ExprType(),
+					NewType: newType,
+				}
+			}
+
+			return &hir.DownCastExprHir{
+				Expr:    left,
+				OldType: left.ExprType(),
+				NewType: newType,
+			}
+		}
+
+		_, ok = left.ExprType().(*types.BoolType)
+		if ok {
+			return &hir.UpCastExprHir{
+				Expr:    left,
+				OldType: left.ExprType(),
+				NewType: newType,
+			}
+		}
+	}
+
+	newFloatType, ok := newType.(*types.FloatType)
+	if ok {
+		leftFloatType, ok := left.ExprType().(*types.FloatType)
+		if ok {
+			if leftFloatType.Bits < newFloatType.Bits {
+				return &hir.UpCastExprHir{
+					Expr:    left,
+					OldType: left.ExprType(),
+					NewType: newType,
+				}
+			}
+		}
+
+		return &hir.DownCastExprHir{
+			Expr:    left,
+			OldType: left.ExprType(),
+			NewType: newType,
+		}
+	}
+
+	panic("not implemented")
 }

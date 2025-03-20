@@ -17,3 +17,11 @@ type FunctionArgType struct {
 func (f *FunctionType) Type() string {
 	return fmt.Sprintf("fun(%s)", f.Name)
 }
+
+func (FunctionType) CanBeImplicitlyCastedTo(t Type) bool {
+	return false
+}
+
+func (FunctionType) CanBeExplicitlyCastedTo(t Type) bool {
+	return false
+}

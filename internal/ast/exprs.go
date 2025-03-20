@@ -8,16 +8,46 @@ type BoolExpr struct {
 	Value bool
 }
 
+type IntType string
+
+const (
+	IntNone     IntType = ""
+	Int8Type    IntType = "i8"
+	Int16Type   IntType = "i16"
+	Int32Type   IntType = "i32"
+	Int64Type   IntType = "i64"
+	Int128Type  IntType = "i128"
+	Uint1Type   IntType = "u1"
+	Uint8Type   IntType = "u8"
+	Uint16Type  IntType = "u16"
+	Uint32Type  IntType = "u32"
+	Uint64Type  IntType = "u64"
+	Uint128Type IntType = "u128"
+)
+
 type IntExpr struct {
 	StartToken *lexer.Token
 
-	Value int64
+	Value        int64
+	ExplicitType IntType
 }
+
+type FloatType string
+
+const (
+	FloatNone    FloatType = ""
+	Float16Type  FloatType = "f16"
+	Float32Type  FloatType = "f32"
+	Float64Type  FloatType = "f64"
+	Float80Type  FloatType = "f80"
+	Float128Type FloatType = "f128"
+)
 
 type FloatExpr struct {
 	StartToken *lexer.Token
 
-	Value float64
+	Value        float64
+	ExplicitType FloatType
 }
 
 type CharExpr struct {

@@ -716,13 +716,13 @@ func (p *Parser) parseVarDeclStmt(
 	p.read()
 	p.expect(lexer.IDENT)
 	varName := p.curr.Value
+	p.read()
 
 	if p.curr.Kind == lexer.COLON {
 		p.read()
 		explicitType = p.parseTypeIdentifier()
 	}
 
-	p.read()
 	p.expect(lexer.ASSIGN)
 
 	p.read()
@@ -1037,11 +1037,48 @@ func (p *Parser) parseIntegerExpr() *ast.IntExpr {
 	}
 
 	p.read()
+	explicitType := ast.IntNone
+	if p.curr.Kind == lexer.COLON {
+		p.read()
+		explicitTypeString := p.curr.Value
+		switch explicitTypeString {
+		case string(ast.Int8Type):
+			explicitType = ast.Int8Type
+		case string(ast.Int16Type):
+			explicitType = ast.Int16Type
+		case string(ast.Int32Type):
+			explicitType = ast.Int32Type
+		case string(ast.Int64Type):
+			explicitType = ast.Int64Type
+		case string(ast.Int128Type):
+			explicitType = ast.Int128Type
+		case string(ast.Uint1Type):
+			explicitType = ast.Uint1Type
+		case string(ast.Uint8Type):
+			explicitType = ast.Uint8Type
+		case string(ast.Uint16Type):
+			explicitType = ast.Uint16Type
+		case string(ast.Uint32Type):
+			explicitType = ast.Uint32Type
+		case string(ast.Uint64Type):
+			explicitType = ast.Uint64Type
+		case string(ast.Uint128Type):
+			explicitType = ast.Uint128Type
+		default:
+			p.eh.AddError(&UnexpectedError{
+				Unexpected: p.curr.Kind,
+			})
+			p.eh.FailNow()
+		}
+
+		p.read()
+	}
 
 	return &ast.IntExpr{
 		StartToken: startToken,
 
-		Value: int,
+		Value:        int,
+		ExplicitType: explicitType,
 	}
 }
 
@@ -1055,11 +1092,36 @@ func (p *Parser) parseFloatExpr() *ast.FloatExpr {
 	}
 
 	p.read()
+	explicitType := ast.FloatNone
+	if p.curr.Kind == lexer.COLON {
+		p.read()
+		explicitTypeString := p.curr.Value
+		switch explicitTypeString {
+		case string(ast.Float16Type):
+			explicitType = ast.Float16Type
+		case string(ast.Float32Type):
+			explicitType = ast.Float32Type
+		case string(ast.Float64Type):
+			explicitType = ast.Float64Type
+		case string(ast.Float80Type):
+			explicitType = ast.Float80Type
+		case string(ast.Float128Type):
+			explicitType = ast.Float128Type
+		default:
+			p.eh.AddError(&UnexpectedError{
+				Unexpected: p.curr.Kind,
+			})
+			p.eh.FailNow()
+		}
+
+		p.read()
+	}
 
 	return &ast.FloatExpr{
 		StartToken: startToken,
 
-		Value: float,
+		Value:        float,
+		ExplicitType: explicitType,
 	}
 }
 

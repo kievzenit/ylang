@@ -38,17 +38,18 @@ func main() {
 		}
 
 		sanitizedTokens = append(sanitizedTokens, token)
-		fmt.Println(token.String())
+		// fmt.Println(token.String())
 	}
 	scanner := l.NewTokenScanner(sanitizedTokens)
 
 	parser := parser.NewParser(absoluteFileName, scanner, eh)
 	translationUnit := parser.Parse()
-	litter.Dump(translationUnit)
+	// litter.Dump(translationUnit)
 
 	semanticAnalyzer := semantic_analyzer.NewSemanticAnalyzer(eh, translationUnit)
 	fileHir := semanticAnalyzer.Analyze()
 	eh.FailIfAnyError()
+	litter.Dump(fileHir)
 
 	emitter := emitter.NewEmitter(fileHir)
 	module := emitter.Emit()

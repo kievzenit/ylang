@@ -2,6 +2,7 @@ package emitter
 
 import (
 	"github.com/kievzenit/ylang/internal/hir"
+	hir_types "github.com/kievzenit/ylang/internal/hir/types"
 	"tinygo.org/x/go-llvm"
 )
 
@@ -45,9 +46,26 @@ func (e *Emitter) Emit() llvm.Module {
 }
 
 func (e *Emitter) declareTypes() {
-	e.typesMap["i32"] = e.context.Int32Type()
-	e.typesMap["f16"] = e.context.FloatType()
 	e.typesMap["bool"] = e.context.Int1Type()
+
+	e.typesMap["i8"] = e.context.Int8Type()
+	e.typesMap["i16"] = e.context.Int16Type()
+	e.typesMap["i32"] = e.context.Int32Type()
+	e.typesMap["i64"] = e.context.Int64Type()
+	e.typesMap["i128"] = e.context.IntType(128)
+
+	e.typesMap["u1"] = e.context.Int1Type()
+	e.typesMap["u8"] = e.context.Int8Type()
+	e.typesMap["u16"] = e.context.Int16Type()
+	e.typesMap["u32"] = e.context.Int32Type()
+	e.typesMap["u64"] = e.context.Int64Type()
+	e.typesMap["u128"] = e.context.IntType(128)
+
+	e.typesMap["f32"] = e.context.FloatType()
+	e.typesMap["f64"] = e.context.DoubleType()
+	e.typesMap["f80"] = e.context.X86FP80Type()
+	e.typesMap["f128"] = e.context.FP128Type()
+
 	e.typesMap["void"] = e.context.VoidType()
 }
 
@@ -146,6 +164,10 @@ func (e *Emitter) emitForExprStmtHir(expStmtHir *hir.ExprStmtHir) {
 
 func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 	switch exprHir.(type) {
+	case *hir.UpCastExprHir:
+		return e.emitForUpCastExprHir(exprHir.(*hir.UpCastExprHir))
+	case *hir.DownCastExprHir:
+		return e.emitForDownCastExprHir(exprHir.(*hir.DownCastExprHir))
 	case *hir.AssignExprHir:
 		return e.emitForAssignExprHir(exprHir.(*hir.AssignExprHir))
 	case *hir.BinaryExprHir:
@@ -167,6 +189,46 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 	}
 }
 
+func (e *Emitter) emitForUpCastExprHir(upCastExprHir *hir.UpCastExprHir) llvm.Value {
+	value := e.emitForExprHir(upCastExprHir.Expr)
+
+	_, ok := upCastExprHir.ExprType().(*hir_types.BoolType)
+	if ok {
+		return e.builder.CreateZExt(value, e.typesMap[upCastExprHir.ExprType().Type()], "upcasttmp")
+	}
+
+	intType, ok := upCastExprHir.ExprType().(*hir_types.IntType)
+	switch {
+	case ok && intType.Signed:
+		return e.builder.CreateSExt(value, e.typesMap[upCastExprHir.ExprType().Type()], "upcasttmp")
+	case ok && !intType.Signed:
+		return e.builder.CreateZExt(value, e.typesMap[upCastExprHir.ExprType().Type()], "upcasttmp")
+	}
+
+	_, ok = upCastExprHir.ExprType().(*hir_types.FloatType)
+	if ok {
+		return e.builder.CreateFPExt(value, e.typesMap[upCastExprHir.ExprType().Type()], "upcasttmp")
+	}
+
+	panic("not implemented")
+}
+
+func (e *Emitter) emitForDownCastExprHir(downCastExprHir *hir.DownCastExprHir) llvm.Value {
+	value := e.emitForExprHir(downCastExprHir.Expr)
+
+	_, ok := downCastExprHir.ExprType().(*hir_types.IntType)
+	if ok {
+		return e.builder.CreateTrunc(value, e.typesMap[downCastExprHir.ExprType().Type()], "downcasttmp")
+	}
+
+	_, ok = downCastExprHir.ExprType().(*hir_types.FloatType)
+	if ok {
+		return e.builder.CreateFPTrunc(value, e.typesMap[downCastExprHir.ExprType().Type()], "downcasttmp")
+	}
+
+	panic("not implemented")
+}
+
 func (e *Emitter) emitForAssignExprHir(assignExprHir *hir.AssignExprHir) llvm.Value {
 	allocValue := e.variablesMap[assignExprHir.Ident.Name]
 	value := e.emitForExprHir(assignExprHir.Value)
@@ -178,17 +240,77 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 	leftValue := e.emitForExprHir(binExprHir.Left)
 	rightValue := e.emitForExprHir(binExprHir.Right)
 
+	var isInt bool
+	var isUint bool
+	var isFloat bool
+
+	intType, ok := binExprHir.ExprType().(*hir_types.IntType)
+	if ok && intType.Signed {
+		isInt = true
+	}
+	if ok && !intType.Signed {
+		isUint = true
+	}
+
+	_, ok = binExprHir.ExprType().(*hir_types.FloatType)
+	if ok {
+		isFloat = true
+	}
+
 	switch binExprHir.Op {
 	case hir.Add:
-		return e.builder.CreateAdd(leftValue, rightValue, "addtmp")
+		switch {
+		case isInt, isUint:
+			return e.builder.CreateAdd(leftValue, rightValue, "addtmp")
+		case isFloat:
+			return e.builder.CreateFAdd(leftValue, rightValue, "addtmp")
+		default:
+			panic("not implemented")
+		}
 	case hir.Sub:
-		return e.builder.CreateSub(leftValue, rightValue, "subtmp")
+		switch {
+		case isInt, isUint:
+			return e.builder.CreateSub(leftValue, rightValue, "subtmp")
+		case isFloat:
+			return e.builder.CreateFSub(leftValue, rightValue, "subtmp")
+		default:
+			panic("not implemented")
+		}
 	case hir.Mul:
-		return e.builder.CreateMul(leftValue, rightValue, "multmp")
+		switch {
+		case isInt, isUint:
+			return e.builder.CreateMul(leftValue, rightValue, "multmp")
+		case isFloat:
+			return e.builder.CreateFMul(leftValue, rightValue, "multmp")
+		default:
+			panic("not implemented")
+		}
 	case hir.Div:
-		return e.builder.CreateSDiv(leftValue, rightValue, "divtmp")
+		switch {
+		case isInt:
+			return e.builder.CreateSDiv(leftValue, rightValue, "divtmp")
+		case isUint:
+			return e.builder.CreateUDiv(leftValue, rightValue, "divtmp")
+		case isFloat:
+			return e.builder.CreateFDiv(leftValue, rightValue, "divtmp")
+		default:
+			panic("not implemented")
+		}
 	case hir.Mod:
-		return e.builder.CreateSRem(leftValue, rightValue, "modtmp")
+		intType, ok := binExprHir.ExprType().(*hir_types.IntType)
+		switch {
+		case ok && intType.Signed:
+			return e.builder.CreateSRem(leftValue, rightValue, "modtmp")
+		case ok && !intType.Signed:
+			return e.builder.CreateURem(leftValue, rightValue, "modtmp")
+		}
+
+		_, ok = binExprHir.ExprType().(*hir_types.FloatType)
+		if ok {
+			return e.builder.CreateFRem(leftValue, rightValue, "modtmp")
+		}
+
+		panic("not implemented")
 	default:
 		panic("not implemented")
 	}
@@ -214,7 +336,8 @@ func (e *Emitter) emitForCallExprHir(callExprHir *hir.CallExprHir) llvm.Value {
 }
 
 func (e *Emitter) emitForIntExprHir(intExprHir *hir.IntExprHir) llvm.Value {
-	return llvm.ConstInt(e.typesMap[intExprHir.ExprType().Type()], uint64(intExprHir.Value), true)
+	intType := intExprHir.ExprType().(*hir_types.IntType)
+	return llvm.ConstInt(e.typesMap[intExprHir.ExprType().Type()], uint64(intExprHir.Value), intType.Signed)
 }
 
 func (e *Emitter) emitForFloatExprHir(floatExprHir *hir.FloatExprHir) llvm.Value {
