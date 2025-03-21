@@ -78,8 +78,9 @@ type SemanticAnalyzer struct {
 	eh              compiler_errors.ErrorHandler
 	translationUnit ast.TranslationUnit
 
-	scope    *scope
-	funcArgs map[string]argDefinition
+	scope       *scope
+	funcArgs    map[string]argDefinition
+	funcRetType types.Type
 
 	typesMap map[string]types.Type
 	funcsMap map[string]types.FunctionType
@@ -297,6 +298,7 @@ func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt) 
 	}
 
 	functionType := sa.funcsMap[funcDeclStmt.Name]
+	sa.funcRetType = functionType.ReturnType
 	for i, arg := range functionType.Args {
 		sa.funcArgs[arg.Name] = argDefinition{
 			Type:  arg.Type,
@@ -337,6 +339,7 @@ func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt) 
 		funcScope.Stmts = append(funcScope.Stmts, &hir.ReturnStmtHir{Expr: nil})
 	}
 
+	sa.funcRetType = nil
 	sa.funcArgs = make(map[string]argDefinition)
 
 	return &hir.FuncDeclStmtHir{
@@ -349,6 +352,8 @@ func (sa *SemanticAnalyzer) analyzeStmt(stmt ast.Stmt) hir.StmtHir {
 	switch stmt.(type) {
 	case *ast.ScopeStmt:
 		return sa.analyzeScopeStmt(stmt.(*ast.ScopeStmt))
+	case *ast.ReturnStmt:
+		return sa.analyzeReturnStmt(stmt.(*ast.ReturnStmt))
 	case *ast.VarDeclStmt:
 		return sa.analyzeVarDeclStmt(stmt.(*ast.VarDeclStmt))
 	case *ast.ExprStmt:
@@ -369,6 +374,48 @@ func (sa *SemanticAnalyzer) analyzeScopeStmt(scopeStmt *ast.ScopeStmt) *hir.Scop
 
 	return &hir.ScopeStmtHir{
 		Stmts: stmts,
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeReturnStmt(returnStmt *ast.ReturnStmt) *hir.ReturnStmtHir {
+	if returnStmt.Expr == nil {
+		if sa.funcRetType != sa.typesMap["void"] {
+			sa.eh.AddError(
+				newSemanticError(
+					"function must return a value",
+					returnStmt.StartToken.Metadata.FileName,
+					returnStmt.StartToken.Metadata.Line,
+					returnStmt.StartToken.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.ReturnStmtHir{
+			Expr: nil,
+		}
+	}
+
+	valueExpr := sa.analyzeExpr(returnStmt.Expr)
+	if hir.IsNilExpr(valueExpr) {
+		return nil
+	}
+
+	valueExpr = sa.tryImplicitCast(valueExpr, sa.funcRetType)
+	if sa.funcRetType != valueExpr.ExprType() {
+		sa.eh.AddError(
+			newSemanticError(
+				"function return type mismatch",
+				returnStmt.StartToken.Metadata.FileName,
+				returnStmt.StartToken.Metadata.Line,
+				returnStmt.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	return &hir.ReturnStmtHir{
+		Expr: valueExpr,
 	}
 }
 
