@@ -510,7 +510,9 @@ func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
 
 	if p.curr.Kind == lexer.SEMICOLON {
 		p.read()
-		return &ast.ReturnStmt{}
+		return &ast.ReturnStmt{
+			StartToken: startToken,
+		}
 	}
 
 	expr := p.parseExpr()
