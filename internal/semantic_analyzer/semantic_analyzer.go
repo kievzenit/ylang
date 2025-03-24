@@ -583,8 +583,29 @@ func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.B
 		return nil
 	}
 
+	var binExprType types.Type
+	switch binaryExpr.Op.Kind {
+	case lexer.LAND, lexer.LOR:
+		if left.ExprType() != sa.typesMap["bool"] {
+			sa.eh.AddError(
+				newSemanticError(
+					"logical operator operands must be of type bool",
+					binaryExpr.Op.Metadata.FileName,
+					binaryExpr.Op.Metadata.Line,
+					binaryExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+		binExprType = sa.typesMap["bool"]
+	case lexer.EQ, lexer.NEQ, lexer.LT, lexer.GT, lexer.GEQ, lexer.LEQ:
+		binExprType = sa.typesMap["bool"]
+	default:
+		binExprType = left.ExprType()
+	}
+
 	return &hir.BinaryExprHir{
-		Type:  left.ExprType(),
+		Type:  binExprType,
 		Left:  left,
 		Op:    hir.BinOpFromTokenKind(binaryExpr.Op.Kind),
 		Right: right,
