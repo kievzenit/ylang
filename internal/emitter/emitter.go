@@ -297,20 +297,16 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Mod:
-		intType, ok := binExprHir.ExprType().(*hir_types.IntType)
 		switch {
-		case ok && intType.Signed:
+		case isInt:
 			return e.builder.CreateSRem(leftValue, rightValue, "modtmp")
-		case ok && !intType.Signed:
+		case isUint:
 			return e.builder.CreateURem(leftValue, rightValue, "modtmp")
-		}
-
-		_, ok = binExprHir.ExprType().(*hir_types.FloatType)
-		if ok {
+		case isFloat:
 			return e.builder.CreateFRem(leftValue, rightValue, "modtmp")
+		default:
+			panic("not implemented")
 		}
-
-		panic("not implemented")
 	default:
 		panic("not implemented")
 	}
