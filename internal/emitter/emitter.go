@@ -307,6 +307,68 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
+	case hir.Gt:
+		switch {
+		case isInt:
+			return e.builder.CreateICmp(llvm.IntSGT, leftValue, rightValue, "gttmp")
+		case isUint:
+			return e.builder.CreateICmp(llvm.IntUGT, leftValue, rightValue, "gttmp")
+		case isFloat:
+			return e.builder.CreateFCmp(llvm.FloatOGT, leftValue, rightValue, "gttmp")
+		default:
+			panic("not implemented")
+		}
+	case hir.Ge:
+		switch {
+		case isInt:
+			return e.builder.CreateICmp(llvm.IntSGE, leftValue, rightValue, "getmp")
+		case isUint:
+			return e.builder.CreateICmp(llvm.IntUGE, leftValue, rightValue, "getmp")
+		case isFloat:
+			return e.builder.CreateFCmp(llvm.FloatOGE, leftValue, rightValue, "getmp")
+		default:
+			panic("not implemented")
+		}
+	case hir.Lt:
+		switch {
+		case isInt:
+			return e.builder.CreateICmp(llvm.IntSLT, leftValue, rightValue, "lttmp")
+		case isUint:
+			return e.builder.CreateICmp(llvm.IntULT, leftValue, rightValue, "lttmp")
+		case isFloat:
+			return e.builder.CreateFCmp(llvm.FloatOLT, leftValue, rightValue, "lttmp")
+		default:
+			panic("not implemented")
+		}
+	case hir.Le:
+		switch {
+		case isInt:
+			return e.builder.CreateICmp(llvm.IntSLE, leftValue, rightValue, "letmp")
+		case isUint:
+			return e.builder.CreateICmp(llvm.IntULE, leftValue, rightValue, "letmp")
+		case isFloat:
+			return e.builder.CreateFCmp(llvm.FloatOLE, leftValue, rightValue, "letmp")
+		default:
+			panic("not implemented")
+		}
+	case hir.Eq:
+		switch {
+		case isInt, isUint:
+			return e.builder.CreateICmp(llvm.IntEQ, leftValue, rightValue, "eqtmp")
+		case isFloat:
+			return e.builder.CreateFCmp(llvm.FloatOEQ, leftValue, rightValue, "eqtmp")
+		default:
+			panic("not implemented")
+		}
+	case hir.Ne:
+		switch {
+		case isInt, isUint:
+			return e.builder.CreateICmp(llvm.IntNE, leftValue, rightValue, "netmp")
+		case isFloat:
+			return e.builder.CreateFCmp(llvm.FloatONE, leftValue, rightValue, "netmp")
+		default:
+			panic("not implemented")
+		}
 	default:
 		panic("not implemented")
 	}
