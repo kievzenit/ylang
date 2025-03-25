@@ -142,6 +142,8 @@ func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
 		e.emitForScopeStmtHir(stmtHir.(*hir.ScopeStmtHir))
 	case *hir.VarDeclStmtHir:
 		e.emitForVarDeclStmtHir(stmtHir.(*hir.VarDeclStmtHir))
+	case *hir.IfStmtHir:
+		e.emitForIfStmtHir(stmtHir.(*hir.IfStmtHir))
 	case *hir.ReturnStmtHir:
 		e.emitForReturnStmtHir(stmtHir.(*hir.ReturnStmtHir))
 	case *hir.ExprStmtHir:
@@ -169,6 +171,55 @@ func (e *Emitter) emitForVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
 
 	varValue := e.emitForExprHir(varDeclStmtHir.Value)
 	e.builder.CreateStore(varValue, allocValue)
+}
+
+func (e *Emitter) emitForIfStmtHir(ifStmtHir *hir.IfStmtHir) {
+	privNextBasicBlock := e.nextBasicBlock
+
+	checkBlock := e.context.AddBasicBlock(e.currentFunc, "ifcheck")
+	ifBody := e.context.AddBasicBlock(e.currentFunc, "ifbody")
+	elseBlock := e.context.AddBasicBlock(e.currentFunc, "ifelse")
+	afterIfBlock := e.context.AddBasicBlock(e.currentFunc, "ifafter")
+
+	checkBlock.MoveAfter(e.privBasicBlock)
+	ifBody.MoveAfter(e.privBasicBlock)
+	elseBlock.MoveAfter(e.privBasicBlock)
+	afterIfBlock.MoveAfter(e.privBasicBlock)
+
+	checkBlock.MoveBefore(e.nextBasicBlock)
+	ifBody.MoveBefore(e.nextBasicBlock)
+	elseBlock.MoveBefore(e.nextBasicBlock)
+	afterIfBlock.MoveBefore(e.nextBasicBlock)
+
+	e.builder.CreateBr(checkBlock)
+	e.builder.SetInsertPointAtEnd(checkBlock)
+
+	e.privBasicBlock = checkBlock
+	e.nextBasicBlock = ifBody
+	condResult := e.emitForExprHir(ifStmtHir.Cond)
+	e.builder.CreateCondBr(condResult, ifBody, elseBlock)
+
+	e.nextBasicBlock = elseBlock
+	e.builder.SetInsertPointAtEnd(ifBody)
+	e.emitForScopeStmtHir(ifStmtHir.Body)
+	if !e.controlFlowHappen {
+		e.builder.CreateBr(afterIfBlock)
+	}
+	e.controlFlowHappen = false
+
+	e.builder.SetInsertPointAtEnd(elseBlock)
+	if ifStmtHir.Else != nil {
+		e.nextBasicBlock = afterIfBlock
+		e.emitForStmtHir(ifStmtHir.Else)
+	}
+
+	if !e.controlFlowHappen {
+		e.builder.CreateBr(afterIfBlock)
+	}
+	e.controlFlowHappen = false
+
+	e.builder.SetInsertPointAtEnd(afterIfBlock)
+	e.nextBasicBlock = privNextBasicBlock
 }
 
 func (e *Emitter) emitForReturnStmtHir(returnStmtHir *hir.ReturnStmtHir) {
