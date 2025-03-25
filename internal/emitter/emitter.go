@@ -237,9 +237,6 @@ func (e *Emitter) emitForAssignExprHir(assignExprHir *hir.AssignExprHir) llvm.Va
 }
 
 func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
-	leftValue := e.emitForExprHir(binExprHir.Left)
-	rightValue := e.emitForExprHir(binExprHir.Right)
-
 	var isInt bool
 	var isUint bool
 	var isFloat bool
@@ -259,6 +256,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 
 	switch binExprHir.Op {
 	case hir.Add:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt, isUint:
 			return e.builder.CreateAdd(leftValue, rightValue, "addtmp")
@@ -268,6 +268,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Sub:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt, isUint:
 			return e.builder.CreateSub(leftValue, rightValue, "subtmp")
@@ -277,6 +280,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Mul:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt, isUint:
 			return e.builder.CreateMul(leftValue, rightValue, "multmp")
@@ -286,6 +292,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Div:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt:
 			return e.builder.CreateSDiv(leftValue, rightValue, "divtmp")
@@ -297,6 +306,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Mod:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt:
 			return e.builder.CreateSRem(leftValue, rightValue, "modtmp")
@@ -308,6 +320,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Gt:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt:
 			return e.builder.CreateICmp(llvm.IntSGT, leftValue, rightValue, "gttmp")
@@ -319,6 +334,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Ge:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt:
 			return e.builder.CreateICmp(llvm.IntSGE, leftValue, rightValue, "getmp")
@@ -330,6 +348,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Lt:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt:
 			return e.builder.CreateICmp(llvm.IntSLT, leftValue, rightValue, "lttmp")
@@ -341,6 +362,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Le:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt:
 			return e.builder.CreateICmp(llvm.IntSLE, leftValue, rightValue, "letmp")
@@ -352,6 +376,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Eq:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt, isUint:
 			return e.builder.CreateICmp(llvm.IntEQ, leftValue, rightValue, "eqtmp")
@@ -361,6 +388,9 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Ne:
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		rightValue := e.emitForExprHir(binExprHir.Right)
+
 		switch {
 		case isInt, isUint:
 			return e.builder.CreateICmp(llvm.IntNE, leftValue, rightValue, "netmp")
