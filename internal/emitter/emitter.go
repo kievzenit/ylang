@@ -123,9 +123,7 @@ func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 
 	e.builder.SetInsertPointAtEnd(entryBasicBlock)
 
-	for _, stmtHir := range funcDeclStmtHir.Body.Stmts {
-		e.emitForStmtHir(stmtHir)
-	}
+	e.emitForScopeStmtHir(funcDeclStmtHir.Body)
 
 	e.builder.SetInsertPointAtEnd(allocBasicBlock)
 	e.builder.CreateBr(entryBasicBlock)
@@ -137,6 +135,8 @@ func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 
 func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
 	switch stmtHir.(type) {
+	case *hir.ScopeStmtHir:
+		e.emitForScopeStmtHir(stmtHir.(*hir.ScopeStmtHir))
 	case *hir.VarDeclStmtHir:
 		e.emitForVarDeclStmtHir(stmtHir.(*hir.VarDeclStmtHir))
 	case *hir.ReturnStmtHir:
@@ -145,6 +145,12 @@ func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
 		e.emitForExprStmtHir(stmtHir.(*hir.ExprStmtHir))
 	default:
 		panic("not implemented")
+	}
+}
+
+func (e *Emitter) emitForScopeStmtHir(scopeStmtHir *hir.ScopeStmtHir) {
+	for _, stmtHir := range scopeStmtHir.Stmts {
+		e.emitForStmtHir(stmtHir)
 	}
 }
 
