@@ -20,6 +20,8 @@ type Emitter struct {
 	currentFunc            llvm.Value
 	currentAllocBasicBlock llvm.BasicBlock
 
+	controlFlowHappen bool
+
 	originBasicBlock llvm.BasicBlock
 	privBasicBlock   llvm.BasicBlock
 	nextBasicBlock   llvm.BasicBlock
@@ -131,6 +133,7 @@ func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 	e.originBasicBlock = llvm.BasicBlock{}
 	e.privBasicBlock = llvm.BasicBlock{}
 	e.nextBasicBlock = llvm.BasicBlock{}
+	e.controlFlowHappen = false
 }
 
 func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
@@ -169,6 +172,8 @@ func (e *Emitter) emitForVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
 }
 
 func (e *Emitter) emitForReturnStmtHir(returnStmtHir *hir.ReturnStmtHir) {
+	e.controlFlowHappen = true
+
 	if returnStmtHir.Expr != nil {
 		value := e.emitForExprHir(returnStmtHir.Expr)
 		e.builder.CreateRet(value)
