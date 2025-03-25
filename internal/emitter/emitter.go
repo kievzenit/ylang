@@ -425,6 +425,8 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			panic("not implemented")
 		}
 	case hir.Land:
+		privNextBasicBlock := e.nextBasicBlock
+
 		checkBlock := e.context.AddBasicBlock(e.currentFunc, "andcheck")
 		trueBlock := e.context.AddBasicBlock(e.currentFunc, "andtrue")
 		mergeBlock := e.context.AddBasicBlock(e.currentFunc, "andmerge")
@@ -465,9 +467,12 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		phi.AddIncoming([]llvm.Value{rightValue}, []llvm.BasicBlock{trueBlock})
 
 		e.originBasicBlock = mergeBlock
+		e.nextBasicBlock = privNextBasicBlock
 
 		return phi
 	case hir.Lor:
+		privNextBasicBlock := e.nextBasicBlock
+
 		checkBlock := e.context.AddBasicBlock(e.currentFunc, "orcheck")
 		falseBlock := e.context.AddBasicBlock(e.currentFunc, "orfalse")
 		mergeBlock := e.context.AddBasicBlock(e.currentFunc, "ormerge")
@@ -508,6 +513,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		phi.AddIncoming([]llvm.Value{rightValue}, []llvm.BasicBlock{falseBlock})
 
 		e.originBasicBlock = mergeBlock
+		e.nextBasicBlock = privNextBasicBlock
 
 		return phi
 	default:
