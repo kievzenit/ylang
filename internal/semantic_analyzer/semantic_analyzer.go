@@ -446,7 +446,12 @@ func (sa *SemanticAnalyzer) analyzeIfStmt(ifStmt *ast.IfStmt) *hir.IfStmtHir {
 		lastElseIf = lastElseIf.Else.(*hir.IfStmtHir)
 	}
 
-	var elseStmt hir.StmtHir = topElseIf
+	var elseStmt hir.StmtHir
+	if topElseIf == nil {
+		elseStmt = nil
+	} else {
+		elseStmt = topElseIf
+	}
 	switch {
 	case ifStmt.Else != nil && lastElseIf != nil:
 		lastElseIf.Else = sa.analyzeScopeStmt(ifStmt.Else)
