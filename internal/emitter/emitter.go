@@ -22,9 +22,7 @@ type Emitter struct {
 
 	controlFlowHappen bool
 
-	originBasicBlock llvm.BasicBlock
-	privBasicBlock   llvm.BasicBlock
-	nextBasicBlock   llvm.BasicBlock
+	nextBasicBlock llvm.BasicBlock
 }
 
 func NewEmitter(fileHir *hir.FileHir) *Emitter {
@@ -116,7 +114,6 @@ func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 	e.currentAllocBasicBlock = allocBasicBlock
 
 	entryBasicBlock := llvm.AddBasicBlock(funcValue, "entry")
-	e.privBasicBlock = allocBasicBlock
 
 	unreachableBasicBlock := llvm.AddBasicBlock(funcValue, "unreachable")
 	e.nextBasicBlock = unreachableBasicBlock
@@ -130,8 +127,6 @@ func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 	e.builder.SetInsertPointAtEnd(allocBasicBlock)
 	e.builder.CreateBr(entryBasicBlock)
 	e.currentAllocBasicBlock = llvm.BasicBlock{}
-	e.originBasicBlock = llvm.BasicBlock{}
-	e.privBasicBlock = llvm.BasicBlock{}
 	e.nextBasicBlock = llvm.BasicBlock{}
 	e.controlFlowHappen = false
 }
@@ -181,11 +176,6 @@ func (e *Emitter) emitForIfStmtHir(ifStmtHir *hir.IfStmtHir) {
 	elseBlock := e.context.AddBasicBlock(e.currentFunc, "ifelse")
 	afterIfBlock := e.context.AddBasicBlock(e.currentFunc, "ifafter")
 
-	checkBlock.MoveAfter(e.privBasicBlock)
-	ifBody.MoveAfter(e.privBasicBlock)
-	elseBlock.MoveAfter(e.privBasicBlock)
-	afterIfBlock.MoveAfter(e.privBasicBlock)
-
 	checkBlock.MoveBefore(e.nextBasicBlock)
 	ifBody.MoveBefore(e.nextBasicBlock)
 	elseBlock.MoveBefore(e.nextBasicBlock)
@@ -194,7 +184,6 @@ func (e *Emitter) emitForIfStmtHir(ifStmtHir *hir.IfStmtHir) {
 	e.builder.CreateBr(checkBlock)
 	e.builder.SetInsertPointAtEnd(checkBlock)
 
-	e.privBasicBlock = checkBlock
 	e.nextBasicBlock = ifBody
 	condResult := e.emitForExprHir(ifStmtHir.Cond)
 	e.builder.CreateCondBr(condResult, ifBody, elseBlock)
@@ -482,10 +471,6 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		trueBlock := e.context.AddBasicBlock(e.currentFunc, "andtrue")
 		mergeBlock := e.context.AddBasicBlock(e.currentFunc, "andmerge")
 
-		checkBlock.MoveAfter(e.privBasicBlock)
-		trueBlock.MoveAfter(e.privBasicBlock)
-		mergeBlock.MoveAfter(e.privBasicBlock)
-
 		checkBlock.MoveBefore(e.nextBasicBlock)
 		trueBlock.MoveBefore(e.nextBasicBlock)
 		mergeBlock.MoveBefore(e.nextBasicBlock)
@@ -493,17 +478,16 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		e.builder.CreateBr(checkBlock)
 		e.builder.SetInsertPointAtEnd(checkBlock)
 
-		e.privBasicBlock = checkBlock
 		e.nextBasicBlock = trueBlock
-		e.originBasicBlock = checkBlock
 		leftValue := e.emitForExprHir(binExprHir.Left)
+		lastBlockInCheck := e.builder.GetInsertBlock()
 		e.builder.CreateCondBr(leftValue, trueBlock, mergeBlock)
 
 		e.builder.SetInsertPointAtEnd(trueBlock)
 
-		e.privBasicBlock = trueBlock
 		e.nextBasicBlock = mergeBlock
 		rightValue := e.emitForExprHir(binExprHir.Right)
+		lastBlockInTrue := e.builder.GetInsertBlock()
 		e.builder.CreateBr(mergeBlock)
 
 		e.builder.SetInsertPointAtEnd(mergeBlock)
@@ -513,11 +497,10 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			[]llvm.Value{
 				llvm.ConstInt(e.typesMap["bool"], 0, false),
 			},
-			[]llvm.BasicBlock{e.originBasicBlock},
+			[]llvm.BasicBlock{lastBlockInCheck},
 		)
-		phi.AddIncoming([]llvm.Value{rightValue}, []llvm.BasicBlock{trueBlock})
+		phi.AddIncoming([]llvm.Value{rightValue}, []llvm.BasicBlock{lastBlockInTrue})
 
-		e.originBasicBlock = mergeBlock
 		e.nextBasicBlock = privNextBasicBlock
 
 		return phi
@@ -528,10 +511,6 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		falseBlock := e.context.AddBasicBlock(e.currentFunc, "orfalse")
 		mergeBlock := e.context.AddBasicBlock(e.currentFunc, "ormerge")
 
-		checkBlock.MoveAfter(e.privBasicBlock)
-		falseBlock.MoveAfter(e.privBasicBlock)
-		mergeBlock.MoveAfter(e.privBasicBlock)
-
 		checkBlock.MoveBefore(e.nextBasicBlock)
 		falseBlock.MoveBefore(e.nextBasicBlock)
 		mergeBlock.MoveBefore(e.nextBasicBlock)
@@ -539,17 +518,16 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		e.builder.CreateBr(checkBlock)
 		e.builder.SetInsertPointAtEnd(checkBlock)
 
-		e.privBasicBlock = checkBlock
 		e.nextBasicBlock = falseBlock
-		e.originBasicBlock = checkBlock
 		leftValue := e.emitForExprHir(binExprHir.Left)
+		lastBlockInCheck := e.builder.GetInsertBlock()
 		e.builder.CreateCondBr(leftValue, mergeBlock, falseBlock)
 
 		e.builder.SetInsertPointAtEnd(falseBlock)
 
-		e.privBasicBlock = falseBlock
 		e.nextBasicBlock = mergeBlock
 		rightValue := e.emitForExprHir(binExprHir.Right)
+		lastBlockInFalse := e.builder.GetInsertBlock()
 		e.builder.CreateBr(mergeBlock)
 
 		e.builder.SetInsertPointAtEnd(mergeBlock)
@@ -559,11 +537,10 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 			[]llvm.Value{
 				llvm.ConstInt(e.typesMap["bool"], 1, false),
 			},
-			[]llvm.BasicBlock{e.originBasicBlock},
+			[]llvm.BasicBlock{lastBlockInCheck},
 		)
-		phi.AddIncoming([]llvm.Value{rightValue}, []llvm.BasicBlock{falseBlock})
+		phi.AddIncoming([]llvm.Value{rightValue}, []llvm.BasicBlock{lastBlockInFalse})
 
-		e.originBasicBlock = mergeBlock
 		e.nextBasicBlock = privNextBasicBlock
 
 		return phi
