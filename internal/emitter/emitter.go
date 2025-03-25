@@ -19,6 +19,10 @@ type Emitter struct {
 
 	currentFunc            llvm.Value
 	currentAllocBasicBlock llvm.BasicBlock
+
+	originBasicBlock llvm.BasicBlock
+	privBasicBlock   llvm.BasicBlock
+	nextBasicBlock   llvm.BasicBlock
 }
 
 func NewEmitter(fileHir *hir.FileHir) *Emitter {
@@ -110,6 +114,13 @@ func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 	e.currentAllocBasicBlock = allocBasicBlock
 
 	entryBasicBlock := llvm.AddBasicBlock(funcValue, "entry")
+	e.privBasicBlock = allocBasicBlock
+
+	unreachableBasicBlock := llvm.AddBasicBlock(funcValue, "unreachable")
+	e.nextBasicBlock = unreachableBasicBlock
+	e.builder.SetInsertPointAtEnd(unreachableBasicBlock)
+	e.builder.CreateUnreachable()
+
 	e.builder.SetInsertPointAtEnd(entryBasicBlock)
 
 	for _, stmtHir := range funcDeclStmtHir.Body.Stmts {
@@ -119,6 +130,9 @@ func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 	e.builder.SetInsertPointAtEnd(allocBasicBlock)
 	e.builder.CreateBr(entryBasicBlock)
 	e.currentAllocBasicBlock = llvm.BasicBlock{}
+	e.originBasicBlock = llvm.BasicBlock{}
+	e.privBasicBlock = llvm.BasicBlock{}
+	e.nextBasicBlock = llvm.BasicBlock{}
 }
 
 func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
@@ -241,7 +255,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 	var isUint bool
 	var isFloat bool
 
-	intType, ok := binExprHir.ExprType().(*hir_types.IntType)
+	intType, ok := binExprHir.Left.ExprType().(*hir_types.IntType)
 	if ok && intType.Signed {
 		isInt = true
 	}
@@ -249,7 +263,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		isUint = true
 	}
 
-	_, ok = binExprHir.ExprType().(*hir_types.FloatType)
+	_, ok = binExprHir.Left.ExprType().(*hir_types.FloatType)
 	if ok {
 		isFloat = true
 	}
@@ -399,6 +413,92 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
+	case hir.Land:
+		checkBlock := e.context.AddBasicBlock(e.currentFunc, "andcheck")
+		trueBlock := e.context.AddBasicBlock(e.currentFunc, "andtrue")
+		mergeBlock := e.context.AddBasicBlock(e.currentFunc, "andmerge")
+
+		checkBlock.MoveAfter(e.privBasicBlock)
+		trueBlock.MoveAfter(e.privBasicBlock)
+		mergeBlock.MoveAfter(e.privBasicBlock)
+
+		checkBlock.MoveBefore(e.nextBasicBlock)
+		trueBlock.MoveBefore(e.nextBasicBlock)
+		mergeBlock.MoveBefore(e.nextBasicBlock)
+
+		e.builder.CreateBr(checkBlock)
+		e.builder.SetInsertPointAtEnd(checkBlock)
+
+		e.privBasicBlock = checkBlock
+		e.nextBasicBlock = trueBlock
+		e.originBasicBlock = checkBlock
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		e.builder.CreateCondBr(leftValue, trueBlock, mergeBlock)
+
+		e.builder.SetInsertPointAtEnd(trueBlock)
+
+		e.privBasicBlock = trueBlock
+		e.nextBasicBlock = mergeBlock
+		rightValue := e.emitForExprHir(binExprHir.Right)
+		e.builder.CreateBr(mergeBlock)
+
+		e.builder.SetInsertPointAtEnd(mergeBlock)
+
+		phi := e.builder.CreatePHI(e.typesMap["bool"], "andphi")
+		phi.AddIncoming(
+			[]llvm.Value{
+				llvm.ConstInt(e.typesMap["bool"], 0, false),
+			},
+			[]llvm.BasicBlock{e.originBasicBlock},
+		)
+		phi.AddIncoming([]llvm.Value{rightValue}, []llvm.BasicBlock{trueBlock})
+
+		e.originBasicBlock = mergeBlock
+
+		return phi
+	case hir.Lor:
+		checkBlock := e.context.AddBasicBlock(e.currentFunc, "orcheck")
+		falseBlock := e.context.AddBasicBlock(e.currentFunc, "orfalse")
+		mergeBlock := e.context.AddBasicBlock(e.currentFunc, "ormerge")
+
+		checkBlock.MoveAfter(e.privBasicBlock)
+		falseBlock.MoveAfter(e.privBasicBlock)
+		mergeBlock.MoveAfter(e.privBasicBlock)
+
+		checkBlock.MoveBefore(e.nextBasicBlock)
+		falseBlock.MoveBefore(e.nextBasicBlock)
+		mergeBlock.MoveBefore(e.nextBasicBlock)
+
+		e.builder.CreateBr(checkBlock)
+		e.builder.SetInsertPointAtEnd(checkBlock)
+
+		e.privBasicBlock = checkBlock
+		e.nextBasicBlock = falseBlock
+		e.originBasicBlock = checkBlock
+		leftValue := e.emitForExprHir(binExprHir.Left)
+		e.builder.CreateCondBr(leftValue, mergeBlock, falseBlock)
+
+		e.builder.SetInsertPointAtEnd(falseBlock)
+
+		e.privBasicBlock = falseBlock
+		e.nextBasicBlock = mergeBlock
+		rightValue := e.emitForExprHir(binExprHir.Right)
+		e.builder.CreateBr(mergeBlock)
+
+		e.builder.SetInsertPointAtEnd(mergeBlock)
+
+		phi := e.builder.CreatePHI(e.typesMap["bool"], "orphi")
+		phi.AddIncoming(
+			[]llvm.Value{
+				llvm.ConstInt(e.typesMap["bool"], 1, false),
+			},
+			[]llvm.BasicBlock{e.originBasicBlock},
+		)
+		phi.AddIncoming([]llvm.Value{rightValue}, []llvm.BasicBlock{falseBlock})
+
+		e.originBasicBlock = mergeBlock
+
+		return phi
 	default:
 		panic("not implemented")
 	}
