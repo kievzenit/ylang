@@ -352,6 +352,8 @@ func (sa *SemanticAnalyzer) analyzeStmt(stmt ast.Stmt) hir.StmtHir {
 	switch stmt.(type) {
 	case *ast.ScopeStmt:
 		return sa.analyzeScopeStmt(stmt.(*ast.ScopeStmt))
+	case *ast.IfStmt:
+		return sa.analyzeIfStmt(stmt.(*ast.IfStmt))
 	case *ast.ReturnStmt:
 		return sa.analyzeReturnStmt(stmt.(*ast.ReturnStmt))
 	case *ast.VarDeclStmt:
@@ -374,6 +376,92 @@ func (sa *SemanticAnalyzer) analyzeScopeStmt(scopeStmt *ast.ScopeStmt) *hir.Scop
 
 	return &hir.ScopeStmtHir{
 		Stmts: stmts,
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeIfStmt(ifStmt *ast.IfStmt) *hir.IfStmtHir {
+	failed := false
+
+	condExpr := sa.analyzeExpr(ifStmt.Cond)
+	if hir.IsNilExpr(condExpr) {
+		return nil
+	}
+
+	condExpr = sa.tryImplicitCast(condExpr, sa.typesMap["bool"])
+	if condExpr.ExprType() != sa.typesMap["bool"] {
+		failed = true
+		sa.eh.AddError(
+			newSemanticError(
+				"if condition must be of type bool",
+				ifStmt.StartToken.Metadata.FileName,
+				ifStmt.StartToken.Metadata.Line,
+				ifStmt.StartToken.Metadata.Column,
+			),
+		)
+	}
+
+	ifBody := sa.analyzeScopeStmt(ifStmt.Body)
+
+	var topElseIf *hir.IfStmtHir
+	var lastElseIf *hir.IfStmtHir
+	for _, elseIfStmt := range ifStmt.ElseIf {
+		elseIfCond := sa.analyzeExpr(elseIfStmt.Cond)
+		if hir.IsNilExpr(elseIfCond) {
+			failed = true
+			continue
+		}
+
+		elseIfCond = sa.tryImplicitCast(elseIfCond, sa.typesMap["bool"])
+		if elseIfCond.ExprType() != sa.typesMap["bool"] {
+			failed = true
+			sa.eh.AddError(
+				newSemanticError(
+					"if condition must be of type bool",
+					elseIfStmt.StartToken.Metadata.FileName,
+					elseIfStmt.StartToken.Metadata.Line,
+					elseIfStmt.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		}
+
+		elseIfBody := sa.analyzeScopeStmt(elseIfStmt.Body)
+
+		if lastElseIf == nil {
+			lastElseIf = &hir.IfStmtHir{
+				Cond: elseIfCond,
+				Body: elseIfBody,
+				Else: nil,
+			}
+			topElseIf = lastElseIf
+			continue
+		}
+
+		lastElseIf.Else = &hir.IfStmtHir{
+			Cond: elseIfCond,
+			Body: elseIfBody,
+			Else: nil,
+		}
+
+		lastElseIf = lastElseIf.Else.(*hir.IfStmtHir)
+	}
+
+	var elseStmt hir.StmtHir = topElseIf
+	switch {
+	case ifStmt.Else != nil && lastElseIf != nil:
+		lastElseIf.Else = sa.analyzeScopeStmt(ifStmt.Else)
+	case ifStmt.Else != nil && lastElseIf == nil:
+		elseStmt = sa.analyzeScopeStmt(ifStmt.Else)
+	}
+
+	if failed {
+		return nil
+	}
+
+	return &hir.IfStmtHir{
+		Cond: condExpr,
+		Body: ifBody,
+		Else: elseStmt,
 	}
 }
 

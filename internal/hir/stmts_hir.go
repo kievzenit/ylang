@@ -30,6 +30,12 @@ type VarDeclStmtHir struct {
 	Value ExprHir
 }
 
+type IfStmtHir struct {
+	Cond ExprHir
+	Body *ScopeStmtHir
+	Else StmtHir
+}
+
 type ReturnStmtHir struct {
 	Expr ExprHir
 }
@@ -41,4 +47,5 @@ func (ExprStmtHir) StmtHirNode()     {}
 func (ScopeStmtHir) StmtHirNode()    {}
 func (FuncDeclStmtHir) StmtHirNode() {}
 func (VarDeclStmtHir) StmtHirNode()  {}
+func (IfStmtHir) StmtHirNode()       {}
 func (ReturnStmtHir) StmtHirNode()   {}
