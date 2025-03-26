@@ -46,6 +46,10 @@ type DoWhileStmtHir struct {
 	Body *ScopeStmtHir
 }
 
+type LoopStmtHir struct {
+	Body *ScopeStmtHir
+}
+
 type ReturnStmtHir struct {
 	Expr ExprHir
 }
@@ -60,4 +64,5 @@ func (VarDeclStmtHir) StmtHirNode()  {}
 func (IfStmtHir) StmtHirNode()       {}
 func (WhileStmtHir) StmtHirNode()    {}
 func (DoWhileStmtHir) StmtHirNode()  {}
+func (LoopStmtHir) StmtHirNode()     {}
 func (ReturnStmtHir) StmtHirNode()   {}

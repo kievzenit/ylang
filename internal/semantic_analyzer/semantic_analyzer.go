@@ -358,6 +358,8 @@ func (sa *SemanticAnalyzer) analyzeStmt(stmt ast.Stmt) hir.StmtHir {
 		return sa.analyzeWhileStmt(stmt.(*ast.WhileStmt))
 	case *ast.DoWhileStmt:
 		return sa.analyzeDoWhileStmt(stmt.(*ast.DoWhileStmt))
+	case *ast.LoopStmt:
+		return sa.analyzeLoopStmt(stmt.(*ast.LoopStmt))
 	case *ast.ReturnStmt:
 		return sa.analyzeReturnStmt(stmt.(*ast.ReturnStmt))
 	case *ast.VarDeclStmt:
@@ -524,6 +526,14 @@ func (sa *SemanticAnalyzer) analyzeDoWhileStmt(doWhileStmt *ast.DoWhileStmt) *hi
 
 	return &hir.DoWhileStmtHir{
 		Cond: condExpr,
+		Body: body,
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeLoopStmt(loopStmt *ast.LoopStmt) *hir.LoopStmtHir {
+	body := sa.analyzeScopeStmt(loopStmt.Body)
+
+	return &hir.LoopStmtHir{
 		Body: body,
 	}
 }
