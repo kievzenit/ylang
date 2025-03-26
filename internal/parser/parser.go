@@ -439,7 +439,7 @@ func (p *Parser) parseFuncDeclStmt(
 
 func (p *Parser) parseStmt() ast.Stmt {
 	switch p.curr.Kind {
-	case lexer.IF, lexer.DO, lexer.WHILE, lexer.LOOP:
+	case lexer.IF, lexer.DO, lexer.WHILE, lexer.LOOP, lexer.FOR:
 		return p.parseControlStmt()
 	case lexer.RETURN, lexer.CONTINUE, lexer.BREAK, lexer.BREAKALL:
 		return p.parseJumpStmt()
@@ -460,6 +460,8 @@ func (p *Parser) parseControlStmt() ast.Stmt {
 		return p.parseWhileStmt()
 	case lexer.LOOP:
 		return p.parseLoopStmt()
+	case lexer.FOR:
+		return p.parseForStmt()
 	}
 
 	p.eh.AddError(&UnexpectedError{
@@ -640,6 +642,72 @@ func (p *Parser) parseLoopStmt() *ast.LoopStmt {
 	return &ast.LoopStmt{
 		StartToken: startToken,
 
+		Body: body,
+	}
+}
+
+func (p *Parser) parseForStmt() *ast.ForStmt {
+	p.expect(lexer.FOR)
+	startToken := p.curr
+	p.read()
+
+	p.expect(lexer.LPAREN)
+	p.read()
+
+	init := make([]ast.Stmt, 0)
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.SEMICOLON {
+		init = append(init, p.parseLocalStmt(false))
+
+		if p.curr.Kind == lexer.COMMA {
+			p.read()
+			continue
+		} else if p.curr.Kind == lexer.SEMICOLON {
+			break
+		}
+
+		p.eh.AddError(&UnexpectedExpectedManyError{
+			Unexpected: p.curr.Kind,
+			Expected:   []lexer.TokenKind{lexer.COMMA, lexer.SEMICOLON},
+		})
+		p.eh.FailNow()
+	}
+
+	p.expect(lexer.SEMICOLON)
+	p.read()
+
+	cond := p.parseExpr()
+	p.expect(lexer.SEMICOLON)
+	p.read()
+
+	post := make([]ast.Expr, 0)
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.RPAREN {
+		post = append(post, p.parseExpr())
+
+		if p.curr.Kind == lexer.COMMA {
+			p.read()
+			continue
+		} else if p.curr.Kind == lexer.RPAREN {
+			break
+		}
+
+		p.eh.AddError(&UnexpectedExpectedManyError{
+			Unexpected: p.curr.Kind,
+			Expected:   []lexer.TokenKind{lexer.COMMA, lexer.RPAREN},
+		})
+		p.eh.FailNow()
+	}
+
+	p.expect(lexer.RPAREN)
+	p.read()
+
+	body := p.parseScopeStmt()
+
+	return &ast.ForStmt{
+		StartToken: startToken,
+
+		Init: init,
+		Cond: cond,
+		Post: post,
 		Body: body,
 	}
 }
