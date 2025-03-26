@@ -75,6 +75,15 @@ type VarDeclStmt struct {
 	Const        bool
 }
 
+type ForStmt struct {
+	StartToken *lexer.Token
+
+	Init []Stmt
+	Cond Expr
+	Post []Expr
+	Body *ScopeStmt
+}
+
 type LoopStmt struct {
 	StartToken *lexer.Token
 
@@ -121,15 +130,15 @@ type ReturnStmt struct {
 	Expr Expr
 }
 
-type BreakStmt struct{
+type BreakStmt struct {
 	StartToken *lexer.Token
 }
 
-type ContinueStmt struct{
+type ContinueStmt struct {
 	StartToken *lexer.Token
 }
 
-type BreakAllStmt struct{
+type BreakAllStmt struct {
 	StartToken *lexer.Token
 }
 
@@ -143,6 +152,7 @@ func (f *FuncDeclStmt) AstNode() {}
 func (v *VarDeclStmt) AstNode()  {}
 func (e *ExprStmt) AstNode()     {}
 func (i *IfStmt) AstNode()       {}
+func (l *ForStmt) AstNode()      {}
 func (l *LoopStmt) AstNode()     {}
 func (w *WhileStmt) AstNode()    {}
 func (d *DoWhileStmt) AstNode()  {}
@@ -157,6 +167,7 @@ func (f *FuncDeclStmt) FirstToken() *lexer.Token { return f.StartToken }
 func (v *VarDeclStmt) FirstToken() *lexer.Token  { return v.StartToken }
 func (e *ExprStmt) FirstToken() *lexer.Token     { return e.Expr.FirstToken() }
 func (i *IfStmt) FirstToken() *lexer.Token       { return i.StartToken }
+func (l *ForStmt) FirstToken() *lexer.Token      { return l.StartToken }
 func (l *LoopStmt) FirstToken() *lexer.Token     { return l.StartToken }
 func (w *WhileStmt) FirstToken() *lexer.Token    { return w.StartToken }
 func (d *DoWhileStmt) FirstToken() *lexer.Token  { return d.StartToken }
@@ -171,6 +182,7 @@ func (f *FuncDeclStmt) StmtNode() {}
 func (v *VarDeclStmt) StmtNode()  {}
 func (e *ExprStmt) StmtNode()     {}
 func (i *IfStmt) StmtNode()       {}
+func (l *ForStmt) StmtNode()      {}
 func (l *LoopStmt) StmtNode()     {}
 func (w *WhileStmt) StmtNode()    {}
 func (d *DoWhileStmt) StmtNode()  {}
