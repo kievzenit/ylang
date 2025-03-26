@@ -356,6 +356,8 @@ func (sa *SemanticAnalyzer) analyzeStmt(stmt ast.Stmt) hir.StmtHir {
 		return sa.analyzeIfStmt(stmt.(*ast.IfStmt))
 	case *ast.WhileStmt:
 		return sa.analyzeWhileStmt(stmt.(*ast.WhileStmt))
+	case *ast.DoWhileStmt:
+		return sa.analyzeDoWhileStmt(stmt.(*ast.DoWhileStmt))
 	case *ast.ReturnStmt:
 		return sa.analyzeReturnStmt(stmt.(*ast.ReturnStmt))
 	case *ast.VarDeclStmt:
@@ -494,6 +496,33 @@ func (sa *SemanticAnalyzer) analyzeWhileStmt(whileStmt *ast.WhileStmt) *hir.Whil
 	body := sa.analyzeScopeStmt(whileStmt.Body)
 
 	return &hir.WhileStmtHir{
+		Cond: condExpr,
+		Body: body,
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeDoWhileStmt(doWhileStmt *ast.DoWhileStmt) *hir.DoWhileStmtHir {
+	body := sa.analyzeScopeStmt(doWhileStmt.Body)
+
+	condExpr := sa.analyzeExpr(doWhileStmt.Cond)
+	if hir.IsNilExpr(condExpr) {
+		return nil
+	}
+
+	condExpr = sa.tryImplicitCast(condExpr, sa.typesMap["bool"])
+	if condExpr.ExprType() != sa.typesMap["bool"] {
+		sa.eh.AddError(
+			newSemanticError(
+				"do while condition must be of type bool",
+				doWhileStmt.StartToken.Metadata.FileName,
+				doWhileStmt.StartToken.Metadata.Line,
+				doWhileStmt.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	return &hir.DoWhileStmtHir{
 		Cond: condExpr,
 		Body: body,
 	}
