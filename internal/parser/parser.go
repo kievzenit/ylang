@@ -208,7 +208,7 @@ func (p *Parser) parseTopSmt() ast.TopStmt {
 	case lexer.STATIC:
 		startToken := p.curr
 		p.read()
-		return p.parseVarDeclStmt(true, startToken)
+		return p.parseVarDeclStmt(true, startToken, true)
 	}
 
 	p.eh.AddError(&UnexpectedError{
@@ -447,7 +447,7 @@ func (p *Parser) parseStmt() ast.Stmt {
 		return p.parseScopeStmt()
 	}
 
-	return p.parseLocalStmt()
+	return p.parseLocalStmt(true)
 }
 
 func (p *Parser) parseControlStmt() ast.Stmt {
@@ -488,19 +488,19 @@ func (p *Parser) parseJumpStmt() ast.Stmt {
 	panic("unreachable")
 }
 
-func (p *Parser) parseLocalStmt() ast.Stmt {
+func (p *Parser) parseLocalStmt(expectSemicolon bool) ast.Stmt {
 	switch p.curr.Kind {
 	case lexer.STATIC:
 		startToken := p.curr
 		p.read()
-		return p.parseVarDeclStmt(true, startToken)
+		return p.parseVarDeclStmt(true, startToken, expectSemicolon)
 	case lexer.CONST:
-		return p.parseVarDeclStmt(false, nil)
+		return p.parseVarDeclStmt(false, nil, expectSemicolon)
 	case lexer.LET:
-		return p.parseVarDeclStmt(false, nil)
+		return p.parseVarDeclStmt(false, nil, expectSemicolon)
 	}
 
-	return p.parseExprStmt()
+	return p.parseExprStmt(expectSemicolon)
 }
 
 func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
@@ -706,6 +706,7 @@ func (p *Parser) parseScopeStmt() *ast.ScopeStmt {
 func (p *Parser) parseVarDeclStmt(
 	static bool,
 	startToken *lexer.Token,
+	expectSemicolon bool,
 ) *ast.VarDeclStmt {
 	var explicitType string
 
@@ -729,9 +730,11 @@ func (p *Parser) parseVarDeclStmt(
 
 	p.read()
 	expr := p.parseExpr()
-	p.expect(lexer.SEMICOLON)
 
-	p.read()
+	if expectSemicolon {
+		p.expect(lexer.SEMICOLON)
+		p.read()
+	}
 
 	return &ast.VarDeclStmt{
 		StartToken: startToken,
@@ -744,10 +747,13 @@ func (p *Parser) parseVarDeclStmt(
 	}
 }
 
-func (p *Parser) parseExprStmt() ast.Stmt {
+func (p *Parser) parseExprStmt(expectSemicolon bool) ast.Stmt {
 	expr := p.parseExpr()
-	p.expect(lexer.SEMICOLON)
-	p.read()
+
+	if expectSemicolon {
+		p.expect(lexer.SEMICOLON)
+		p.read()
+	}
 
 	return &ast.ExprStmt{
 		Expr: expr,
