@@ -141,6 +141,8 @@ func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
 		e.emitForIfStmtHir(stmtHir.(*hir.IfStmtHir))
 	case *hir.WhileStmtHir:
 		e.emitForWhileStmtHir(stmtHir.(*hir.WhileStmtHir))
+	case *hir.DoWhileStmtHir:
+		e.emitForDoWhileStmtHir(stmtHir.(*hir.DoWhileStmtHir))
 	case *hir.ReturnStmtHir:
 		e.emitForReturnStmtHir(stmtHir.(*hir.ReturnStmtHir))
 	case *hir.ExprStmtHir:
@@ -239,6 +241,36 @@ func (e *Emitter) emitForWhileStmtHir(whileStmtHir *hir.WhileStmtHir) {
 		e.builder.CreateBr(checkBlock)
 	}
 	e.controlFlowHappen = false
+
+	e.builder.SetInsertPointAtEnd(afterBlock)
+	e.nextBasicBlock = privNextBasicBlock
+}
+
+func (e *Emitter) emitForDoWhileStmtHir(doWhileStmtHir *hir.DoWhileStmtHir) {
+	privNextBasicBlock := e.nextBasicBlock
+
+	bodyBlock := e.context.AddBasicBlock(e.currentFunc, "dowhilebody")
+	checkBlock := e.context.AddBasicBlock(e.currentFunc, "dowhilecheck")
+	afterBlock := e.context.AddBasicBlock(e.currentFunc, "dowhileafter")
+
+	bodyBlock.MoveBefore(e.nextBasicBlock)
+	checkBlock.MoveBefore(e.nextBasicBlock)
+	afterBlock.MoveBefore(e.nextBasicBlock)
+
+	e.builder.CreateBr(bodyBlock)
+	e.builder.SetInsertPointAtEnd(bodyBlock)
+
+	e.nextBasicBlock = checkBlock
+	e.emitForScopeStmtHir(doWhileStmtHir.Body)
+	if !e.controlFlowHappen {
+		e.builder.CreateBr(checkBlock)
+	}
+	e.controlFlowHappen = false
+
+	e.nextBasicBlock = afterBlock
+	e.builder.SetInsertPointAtEnd(checkBlock)
+	condValue := e.emitForExprHir(doWhileStmtHir.Cond)
+	e.builder.CreateCondBr(condValue, bodyBlock, afterBlock)
 
 	e.builder.SetInsertPointAtEnd(afterBlock)
 	e.nextBasicBlock = privNextBasicBlock
