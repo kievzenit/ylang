@@ -37,7 +37,7 @@
 
 <for_statement> ::= "for" "(" <for_init>? ";" <expression> ";" <for_after_each>? ")" <scope_statement>
 <for_init> ::= <local_statement> ("," <local_statement>)*
-<for_after_each> ::= <expression_statement> ("," <expression_statement>)*
+<for_after_each> ::= <expression> ("," <expression>)*
 
 <loop_statement> ::= "loop" <scope_statement>
 <do_while_statement> ::= "do" <scope_statement> "while" <parenthesis_expression> ";"
