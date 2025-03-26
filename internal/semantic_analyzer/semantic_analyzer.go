@@ -354,6 +354,8 @@ func (sa *SemanticAnalyzer) analyzeStmt(stmt ast.Stmt) hir.StmtHir {
 		return sa.analyzeScopeStmt(stmt.(*ast.ScopeStmt))
 	case *ast.IfStmt:
 		return sa.analyzeIfStmt(stmt.(*ast.IfStmt))
+	case *ast.WhileStmt:
+		return sa.analyzeWhileStmt(stmt.(*ast.WhileStmt))
 	case *ast.ReturnStmt:
 		return sa.analyzeReturnStmt(stmt.(*ast.ReturnStmt))
 	case *ast.VarDeclStmt:
@@ -467,6 +469,33 @@ func (sa *SemanticAnalyzer) analyzeIfStmt(ifStmt *ast.IfStmt) *hir.IfStmtHir {
 		Cond: condExpr,
 		Body: ifBody,
 		Else: elseStmt,
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeWhileStmt(whileStmt *ast.WhileStmt) *hir.WhileStmtHir {
+	condExpr := sa.analyzeExpr(whileStmt.Cond)
+	if hir.IsNilExpr(condExpr) {
+		return nil
+	}
+
+	condExpr = sa.tryImplicitCast(condExpr, sa.typesMap["bool"])
+	if condExpr.ExprType() != sa.typesMap["bool"] {
+		sa.eh.AddError(
+			newSemanticError(
+				"while condition must be of type bool",
+				whileStmt.StartToken.Metadata.FileName,
+				whileStmt.StartToken.Metadata.Line,
+				whileStmt.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	body := sa.analyzeScopeStmt(whileStmt.Body)
+
+	return &hir.WhileStmtHir{
+		Cond: condExpr,
+		Body: body,
 	}
 }
 
