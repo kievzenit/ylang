@@ -63,6 +63,8 @@ type ReturnStmtHir struct {
 
 type ContinueStmtHir struct{}
 
+type BreakStmtHir struct{}
+
 func (VarDeclStmtHir) TopStmtHirNode()  {}
 func (FuncDeclStmtHir) TopStmtHirNode() {}
 
@@ -77,3 +79,4 @@ func (LoopStmtHir) StmtHirNode()     {}
 func (ForStmtHir) StmtHirNode()      {}
 func (ReturnStmtHir) StmtHirNode()   {}
 func (ContinueStmtHir) StmtHirNode() {}
+func (BreakStmtHir) StmtHirNode()    {}

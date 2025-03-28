@@ -380,6 +380,8 @@ func (sa *SemanticAnalyzer) analyzeStmt(stmt ast.Stmt) hir.StmtHir {
 		return sa.analyzeReturnStmt(stmt.(*ast.ReturnStmt))
 	case *ast.ContinueStmt:
 		return sa.analyzeContinueStmt(stmt.(*ast.ContinueStmt))
+	case *ast.BreakStmt:
+		return sa.analyzeBreakStmt(stmt.(*ast.BreakStmt))
 	case *ast.VarDeclStmt:
 		return sa.analyzeVarDeclStmt(stmt.(*ast.VarDeclStmt))
 	case *ast.ExprStmt:
@@ -688,6 +690,22 @@ func (sa *SemanticAnalyzer) analyzeContinueStmt(continueStmt *ast.ContinueStmt) 
 	}
 
 	return &hir.ContinueStmtHir{}
+}
+
+func (sa *SemanticAnalyzer) analyzeBreakStmt(breakStmt *ast.BreakStmt) *hir.BreakStmtHir {
+	if !sa.inLoop() {
+		sa.eh.AddError(
+			newSemanticError(
+				"break statement must be inside a loop",
+				breakStmt.StartToken.Metadata.FileName,
+				breakStmt.StartToken.Metadata.Line,
+				breakStmt.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	return &hir.BreakStmtHir{}
 }
 
 func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hir.VarDeclStmtHir {
