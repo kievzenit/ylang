@@ -162,6 +162,8 @@ func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
 		e.emitForContinueStmtHir(stmtHir.(*hir.ContinueStmtHir))
 	case *hir.BreakStmtHir:
 		e.emitForBreakStmtHir(stmtHir.(*hir.BreakStmtHir))
+	case *hir.BreakAllStmtHir:
+		e.emitForBreakAllStmtHir(stmtHir.(*hir.BreakAllStmtHir))
 	case *hir.ExprStmtHir:
 		e.emitForExprStmtHir(stmtHir.(*hir.ExprStmtHir))
 	default:
@@ -404,6 +406,11 @@ func (e *Emitter) emitForContinueStmtHir(_ *hir.ContinueStmtHir) {
 func (e *Emitter) emitForBreakStmtHir(_ *hir.BreakStmtHir) {
 	e.controlFlowHappen = true
 	e.builder.CreateBr(e.loopsBreakBasicBlock[len(e.loopsBreakBasicBlock)-1])
+}
+
+func (e *Emitter) emitForBreakAllStmtHir(_ *hir.BreakAllStmtHir) {
+	e.controlFlowHappen = true
+	e.builder.CreateBr(e.loopsBreakBasicBlock[0])
 }
 
 func (e *Emitter) emitForExprStmtHir(expStmtHir *hir.ExprStmtHir) {
