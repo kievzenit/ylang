@@ -401,6 +401,11 @@ func (e *Emitter) emitForContinueStmtHir(_ *hir.ContinueStmtHir) {
 	e.builder.CreateBr(e.loopsContinueBasicBlocks[len(e.loopsContinueBasicBlocks)-1])
 }
 
+func (e *Emitter) emitForBreakStmtHir(_ *hir.BreakStmtHir) {
+	e.controlFlowHappen = true
+	e.builder.CreateBr(e.loopsBreakBasicBlock[len(e.loopsBreakBasicBlock)-1])
+}
+
 func (e *Emitter) emitForExprStmtHir(expStmtHir *hir.ExprStmtHir) {
 	e.emitForExprHir(expStmtHir.Expr)
 }
