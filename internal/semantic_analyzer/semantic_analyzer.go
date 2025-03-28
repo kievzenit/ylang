@@ -84,6 +84,20 @@ type SemanticAnalyzer struct {
 
 	typesMap map[string]types.Type
 	funcsMap map[string]types.FunctionType
+
+	loopDepth int
+}
+
+func (sa *SemanticAnalyzer) enterLoop() {
+	sa.loopDepth++
+}
+
+func (sa *SemanticAnalyzer) exitLoop() {
+	sa.loopDepth--
+}
+
+func (sa *SemanticAnalyzer) inLoop() bool {
+	return sa.loopDepth > 0
 }
 
 func NewSemanticAnalyzer(
@@ -479,6 +493,9 @@ func (sa *SemanticAnalyzer) analyzeIfStmt(ifStmt *ast.IfStmt) *hir.IfStmtHir {
 }
 
 func (sa *SemanticAnalyzer) analyzeWhileStmt(whileStmt *ast.WhileStmt) *hir.WhileStmtHir {
+	sa.enterLoop()
+	defer sa.exitLoop()
+
 	condExpr := sa.analyzeExpr(whileStmt.Cond)
 	if hir.IsNilExpr(condExpr) {
 		return nil
@@ -506,6 +523,9 @@ func (sa *SemanticAnalyzer) analyzeWhileStmt(whileStmt *ast.WhileStmt) *hir.Whil
 }
 
 func (sa *SemanticAnalyzer) analyzeDoWhileStmt(doWhileStmt *ast.DoWhileStmt) *hir.DoWhileStmtHir {
+	sa.enterLoop()
+	defer sa.exitLoop()
+
 	body := sa.analyzeScopeStmt(doWhileStmt.Body)
 
 	condExpr := sa.analyzeExpr(doWhileStmt.Cond)
@@ -533,6 +553,9 @@ func (sa *SemanticAnalyzer) analyzeDoWhileStmt(doWhileStmt *ast.DoWhileStmt) *hi
 }
 
 func (sa *SemanticAnalyzer) analyzeLoopStmt(loopStmt *ast.LoopStmt) *hir.LoopStmtHir {
+	sa.enterLoop()
+	defer sa.exitLoop()
+
 	body := sa.analyzeScopeStmt(loopStmt.Body)
 
 	return &hir.LoopStmtHir{
@@ -541,6 +564,9 @@ func (sa *SemanticAnalyzer) analyzeLoopStmt(loopStmt *ast.LoopStmt) *hir.LoopStm
 }
 
 func (sa *SemanticAnalyzer) analyzeForStmt(forStmt *ast.ForStmt) *hir.ForStmtHir {
+	sa.enterLoop()
+	defer sa.exitLoop()
+
 	failed := false
 
 	init := make([]hir.StmtHir, 0)
