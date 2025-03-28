@@ -568,6 +568,8 @@ func (sa *SemanticAnalyzer) analyzeLoopStmt(loopStmt *ast.LoopStmt) *hir.LoopStm
 func (sa *SemanticAnalyzer) analyzeForStmt(forStmt *ast.ForStmt) *hir.ForStmtHir {
 	sa.enterLoop()
 	defer sa.exitLoop()
+	sa.enterScope()
+	defer sa.exitScope()
 
 	failed := false
 
