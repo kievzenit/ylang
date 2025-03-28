@@ -145,6 +145,8 @@ func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
 		e.emitForDoWhileStmtHir(stmtHir.(*hir.DoWhileStmtHir))
 	case *hir.LoopStmtHir:
 		e.emitForLoopStmtHir(stmtHir.(*hir.LoopStmtHir))
+	case *hir.ForStmtHir:
+		e.emitForForStmtHir(stmtHir.(*hir.ForStmtHir))
 	case *hir.ReturnStmtHir:
 		e.emitForReturnStmtHir(stmtHir.(*hir.ReturnStmtHir))
 	case *hir.ExprStmtHir:
@@ -297,6 +299,53 @@ func (e *Emitter) emitForLoopStmtHir(loopStmtHir *hir.LoopStmtHir) {
 		e.builder.CreateBr(bodyBlock)
 	}
 	e.controlFlowHappen = false
+
+	e.builder.SetInsertPointAtEnd(afterBlock)
+	e.nextBasicBlock = privNextBasicBlock
+}
+
+func (e *Emitter) emitForForStmtHir(forStmtHir *hir.ForStmtHir) {
+	privNextBasicBlock := e.nextBasicBlock
+
+	initBlock := e.context.AddBasicBlock(e.currentFunc, "forinit")
+	checkBlock := e.context.AddBasicBlock(e.currentFunc, "forcheck")
+	bodyBlock := e.context.AddBasicBlock(e.currentFunc, "forbody")
+	postBlock := e.context.AddBasicBlock(e.currentFunc, "forpost")
+	afterBlock := e.context.AddBasicBlock(e.currentFunc, "forafter")
+
+	initBlock.MoveBefore(e.nextBasicBlock)
+	checkBlock.MoveBefore(e.nextBasicBlock)
+	bodyBlock.MoveBefore(e.nextBasicBlock)
+	postBlock.MoveBefore(e.nextBasicBlock)
+	afterBlock.MoveBefore(e.nextBasicBlock)
+
+	e.builder.CreateBr(initBlock)
+	e.builder.SetInsertPointAtEnd(initBlock)
+	e.nextBasicBlock = checkBlock
+	for _, stmt := range forStmtHir.Init {
+		e.emitForStmtHir(stmt)
+	}
+
+	e.builder.CreateBr(checkBlock)
+	e.builder.SetInsertPointAtEnd(checkBlock)
+	e.nextBasicBlock = bodyBlock
+	condValue := e.emitForExprHir(forStmtHir.Cond)
+	e.builder.CreateCondBr(condValue, bodyBlock, afterBlock)
+
+	e.builder.SetInsertPointAtEnd(bodyBlock)
+	e.nextBasicBlock = postBlock
+	e.emitForScopeStmtHir(forStmtHir.Body)
+	if !e.controlFlowHappen {
+		e.builder.CreateBr(postBlock)
+	}
+	e.controlFlowHappen = false
+
+	e.builder.SetInsertPointAtEnd(postBlock)
+	e.nextBasicBlock = afterBlock
+	for _, expr := range forStmtHir.Post {
+		e.emitForExprHir(expr)
+	}
+	e.builder.CreateBr(checkBlock)
 
 	e.builder.SetInsertPointAtEnd(afterBlock)
 	e.nextBasicBlock = privNextBasicBlock
