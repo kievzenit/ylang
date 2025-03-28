@@ -61,6 +61,8 @@ type ReturnStmtHir struct {
 	Expr ExprHir
 }
 
+type ContinueStmtHir struct{}
+
 func (VarDeclStmtHir) TopStmtHirNode()  {}
 func (FuncDeclStmtHir) TopStmtHirNode() {}
 
@@ -74,3 +76,4 @@ func (DoWhileStmtHir) StmtHirNode()  {}
 func (LoopStmtHir) StmtHirNode()     {}
 func (ForStmtHir) StmtHirNode()      {}
 func (ReturnStmtHir) StmtHirNode()   {}
+func (ContinueStmtHir) StmtHirNode() {}
