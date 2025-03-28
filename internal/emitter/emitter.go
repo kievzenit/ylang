@@ -20,7 +20,8 @@ type Emitter struct {
 	currentFunc            llvm.Value
 	currentAllocBasicBlock llvm.BasicBlock
 
-	controlFlowHappen bool
+	controlFlowHappen        bool
+	loopsContinueBasicBlocks []llvm.BasicBlock
 
 	nextBasicBlock llvm.BasicBlock
 }
@@ -37,6 +38,8 @@ func NewEmitter(fileHir *hir.FileHir) *Emitter {
 		context: context,
 		module:  context.NewModule("main"),
 		builder: context.NewBuilder(),
+
+		loopsContinueBasicBlocks: make([]llvm.BasicBlock, 0),
 	}
 }
 
@@ -129,6 +132,7 @@ func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 	e.currentAllocBasicBlock = llvm.BasicBlock{}
 	e.nextBasicBlock = llvm.BasicBlock{}
 	e.controlFlowHappen = false
+	e.loopsContinueBasicBlocks = make([]llvm.BasicBlock, 0)
 }
 
 func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
@@ -149,6 +153,8 @@ func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
 		e.emitForForStmtHir(stmtHir.(*hir.ForStmtHir))
 	case *hir.ReturnStmtHir:
 		e.emitForReturnStmtHir(stmtHir.(*hir.ReturnStmtHir))
+	case *hir.ContinueStmtHir:
+		e.emitForContinueStmtHir(stmtHir.(*hir.ContinueStmtHir))
 	case *hir.ExprStmtHir:
 		e.emitForExprStmtHir(stmtHir.(*hir.ExprStmtHir))
 	default:
@@ -226,6 +232,8 @@ func (e *Emitter) emitForWhileStmtHir(whileStmtHir *hir.WhileStmtHir) {
 	bodyBlock := e.context.AddBasicBlock(e.currentFunc, "whilebody")
 	afterBlock := e.context.AddBasicBlock(e.currentFunc, "whileafter")
 
+	e.loopsContinueBasicBlocks = append(e.loopsContinueBasicBlocks, checkBlock)
+
 	checkBlock.MoveBefore(e.nextBasicBlock)
 	bodyBlock.MoveBefore(e.nextBasicBlock)
 	afterBlock.MoveBefore(e.nextBasicBlock)
@@ -248,6 +256,7 @@ func (e *Emitter) emitForWhileStmtHir(whileStmtHir *hir.WhileStmtHir) {
 
 	e.builder.SetInsertPointAtEnd(afterBlock)
 	e.nextBasicBlock = privNextBasicBlock
+	e.loopsContinueBasicBlocks = e.loopsContinueBasicBlocks[:len(e.loopsContinueBasicBlocks)-1]
 }
 
 func (e *Emitter) emitForDoWhileStmtHir(doWhileStmtHir *hir.DoWhileStmtHir) {
@@ -256,6 +265,8 @@ func (e *Emitter) emitForDoWhileStmtHir(doWhileStmtHir *hir.DoWhileStmtHir) {
 	bodyBlock := e.context.AddBasicBlock(e.currentFunc, "dowhilebody")
 	checkBlock := e.context.AddBasicBlock(e.currentFunc, "dowhilecheck")
 	afterBlock := e.context.AddBasicBlock(e.currentFunc, "dowhileafter")
+
+	e.loopsContinueBasicBlocks = append(e.loopsContinueBasicBlocks, checkBlock)
 
 	bodyBlock.MoveBefore(e.nextBasicBlock)
 	checkBlock.MoveBefore(e.nextBasicBlock)
@@ -278,6 +289,7 @@ func (e *Emitter) emitForDoWhileStmtHir(doWhileStmtHir *hir.DoWhileStmtHir) {
 
 	e.builder.SetInsertPointAtEnd(afterBlock)
 	e.nextBasicBlock = privNextBasicBlock
+	e.loopsContinueBasicBlocks = e.loopsContinueBasicBlocks[:len(e.loopsContinueBasicBlocks)-1]
 }
 
 func (e *Emitter) emitForLoopStmtHir(loopStmtHir *hir.LoopStmtHir) {
@@ -285,6 +297,8 @@ func (e *Emitter) emitForLoopStmtHir(loopStmtHir *hir.LoopStmtHir) {
 
 	bodyBlock := e.context.AddBasicBlock(e.currentFunc, "loopbody")
 	afterBlock := e.context.AddBasicBlock(e.currentFunc, "loopafter")
+
+	e.loopsContinueBasicBlocks = append(e.loopsContinueBasicBlocks, bodyBlock)
 
 	bodyBlock.MoveBefore(e.nextBasicBlock)
 	afterBlock.MoveBefore(e.nextBasicBlock)
@@ -302,6 +316,7 @@ func (e *Emitter) emitForLoopStmtHir(loopStmtHir *hir.LoopStmtHir) {
 
 	e.builder.SetInsertPointAtEnd(afterBlock)
 	e.nextBasicBlock = privNextBasicBlock
+	e.loopsContinueBasicBlocks = e.loopsContinueBasicBlocks[:len(e.loopsContinueBasicBlocks)-1]
 }
 
 func (e *Emitter) emitForForStmtHir(forStmtHir *hir.ForStmtHir) {
@@ -312,6 +327,8 @@ func (e *Emitter) emitForForStmtHir(forStmtHir *hir.ForStmtHir) {
 	bodyBlock := e.context.AddBasicBlock(e.currentFunc, "forbody")
 	postBlock := e.context.AddBasicBlock(e.currentFunc, "forpost")
 	afterBlock := e.context.AddBasicBlock(e.currentFunc, "forafter")
+
+	e.loopsContinueBasicBlocks = append(e.loopsContinueBasicBlocks, postBlock)
 
 	initBlock.MoveBefore(e.nextBasicBlock)
 	checkBlock.MoveBefore(e.nextBasicBlock)
@@ -349,6 +366,7 @@ func (e *Emitter) emitForForStmtHir(forStmtHir *hir.ForStmtHir) {
 
 	e.builder.SetInsertPointAtEnd(afterBlock)
 	e.nextBasicBlock = privNextBasicBlock
+	e.loopsContinueBasicBlocks = e.loopsContinueBasicBlocks[:len(e.loopsContinueBasicBlocks)-1]
 }
 
 func (e *Emitter) emitForReturnStmtHir(returnStmtHir *hir.ReturnStmtHir) {
@@ -361,6 +379,11 @@ func (e *Emitter) emitForReturnStmtHir(returnStmtHir *hir.ReturnStmtHir) {
 	}
 
 	e.builder.CreateRetVoid()
+}
+
+func (e *Emitter) emitForContinueStmtHir(_ *hir.ContinueStmtHir) {
+	e.controlFlowHappen = true
+	e.builder.CreateBr(e.loopsContinueBasicBlocks[len(e.loopsContinueBasicBlocks)-1])
 }
 
 func (e *Emitter) emitForExprStmtHir(expStmtHir *hir.ExprStmtHir) {
