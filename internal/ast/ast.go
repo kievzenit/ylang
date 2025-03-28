@@ -28,6 +28,11 @@ type TopStmt interface {
 	TopStmtNode()
 }
 
+type ControlFlowStmt interface {
+	Stmt
+	ControlFlowStmtNode()
+}
+
 type Expr interface {
 	AstNode
 	ExprNode()

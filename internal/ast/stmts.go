@@ -146,6 +146,11 @@ func (t *TypeDeclStmt) TopStmtNode() {}
 func (f *FuncDeclStmt) TopStmtNode() {}
 func (v *VarDeclStmt) TopStmtNode()  {}
 
+func (ReturnStmt) ControlFlowStmtNode()   {}
+func (BreakStmt) ControlFlowStmtNode()    {}
+func (ContinueStmt) ControlFlowStmtNode() {}
+func (BreakAllStmt) ControlFlowStmtNode() {}
+
 func (s *ScopeStmt) AstNode()    {}
 func (t *TypeDeclStmt) AstNode() {}
 func (f *FuncDeclStmt) AstNode() {}
