@@ -398,8 +398,17 @@ func (sa *SemanticAnalyzer) analyzeScopeStmt(scopeStmt *ast.ScopeStmt) *hir.Scop
 	defer sa.exitScope()
 
 	stmts := make([]hir.StmtHir, 0)
+	skip := false
+
 	for _, stmt := range scopeStmt.Stmts {
-		stmts = append(stmts, sa.analyzeStmt(stmt))
+		stmtHir := sa.analyzeStmt(stmt)
+		if !skip {
+			stmts = append(stmts, stmtHir)
+		}
+
+		if _, ok := stmt.(ast.ControlFlowStmt); ok {
+			skip = true
+		}
 	}
 
 	return &hir.ScopeStmtHir{
