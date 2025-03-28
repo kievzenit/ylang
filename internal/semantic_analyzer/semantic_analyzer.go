@@ -360,6 +360,8 @@ func (sa *SemanticAnalyzer) analyzeStmt(stmt ast.Stmt) hir.StmtHir {
 		return sa.analyzeDoWhileStmt(stmt.(*ast.DoWhileStmt))
 	case *ast.LoopStmt:
 		return sa.analyzeLoopStmt(stmt.(*ast.LoopStmt))
+	case *ast.ForStmt:
+		return sa.analyzeForStmt(stmt.(*ast.ForStmt))
 	case *ast.ReturnStmt:
 		return sa.analyzeReturnStmt(stmt.(*ast.ReturnStmt))
 	case *ast.VarDeclStmt:
@@ -534,6 +536,68 @@ func (sa *SemanticAnalyzer) analyzeLoopStmt(loopStmt *ast.LoopStmt) *hir.LoopStm
 	body := sa.analyzeScopeStmt(loopStmt.Body)
 
 	return &hir.LoopStmtHir{
+		Body: body,
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeForStmt(forStmt *ast.ForStmt) *hir.ForStmtHir {
+	failed := false
+
+	init := make([]hir.StmtHir, 0)
+	for _, stmt := range forStmt.Init {
+		stmtHir := sa.analyzeStmt(stmt)
+		if stmtHir == nil {
+			failed = true
+			continue
+		}
+
+		init = append(init, stmtHir)
+	}
+
+	condExpr := sa.analyzeExpr(forStmt.Cond)
+	if hir.IsNilExpr(condExpr) {
+		failed = true
+	}
+
+	if !hir.IsNilExpr(condExpr) {
+		condExpr = sa.tryImplicitCast(condExpr, sa.typesMap["bool"])
+		if condExpr.ExprType() != sa.typesMap["bool"] {
+			sa.eh.AddError(
+				newSemanticError(
+					"for condition must be of type bool",
+					forStmt.StartToken.Metadata.FileName,
+					forStmt.StartToken.Metadata.Line,
+					forStmt.StartToken.Metadata.Column,
+				),
+			)
+			failed = true
+		}
+	}
+
+	post := make([]hir.ExprHir, 0)
+	for _, expr := range forStmt.Post {
+		exprHir := sa.analyzeExpr(expr)
+		if exprHir == nil {
+			failed = true
+			continue
+		}
+
+		post = append(post, exprHir)
+	}
+
+	body := sa.analyzeScopeStmt(forStmt.Body)
+	if body == nil {
+		failed = true
+	}
+
+	if failed {
+		return nil
+	}
+
+	return &hir.ForStmtHir{
+		Init: init,
+		Cond: condExpr,
+		Post: post,
 		Body: body,
 	}
 }

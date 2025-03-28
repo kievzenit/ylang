@@ -50,6 +50,13 @@ type LoopStmtHir struct {
 	Body *ScopeStmtHir
 }
 
+type ForStmtHir struct {
+	Init []StmtHir
+	Cond ExprHir
+	Post []ExprHir
+	Body *ScopeStmtHir
+}
+
 type ReturnStmtHir struct {
 	Expr ExprHir
 }
@@ -65,4 +72,5 @@ func (IfStmtHir) StmtHirNode()       {}
 func (WhileStmtHir) StmtHirNode()    {}
 func (DoWhileStmtHir) StmtHirNode()  {}
 func (LoopStmtHir) StmtHirNode()     {}
+func (ForStmtHir) StmtHirNode()      {}
 func (ReturnStmtHir) StmtHirNode()   {}
