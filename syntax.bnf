@@ -62,11 +62,9 @@
 <expression_statement> ::= <expression> ";"
 <variable_declaration_statement> ::= "static"? ("let" | "const") <identifier_literal> (":" <type_identifier>)? "=" <expression> ";"
 
-<expression> ::= <primary_expression>
-    | <postfix_expression>
+<expression> ::= <unary_expression>
     | <binary_expression>
     | <assignment_expression>
-    | <complex_cast_expression>
 
 <assignment_expression> ::= <identifier_literal> <assignment_operator> <expression>
 <assignment_operator> ::= "="
@@ -105,18 +103,29 @@
     | "!="
     | "=="
 
-<postfix_expression> ::= <primary_expression> <postfix_part>*
+<unary_expression> ::= <prefix_expression> | <postfix_expression>
 
-<postfix_part> ::= "." <identifier_literal>
-    | "[" <expression> "]"
-    | "(" (<expression> ("," <expression>)*)? ")"
-    | ">-" "{" <identifier_literal> ":" <type_identifier> "}"
-    | ">-" <type_identifier>
+<prefix_expression:> ::= <prefix_part>? <postfix_expression>
+<prefix_part> ::= "++" | "--" | "-" | "+" | "!" | "~" | "&" | "*"
+
+<postfix_expression> ::= <primary_expression> <postfix_part>?
+<postfix_part> ::= "++" | "--"
 
 <primary_expression> ::= <literal_expression>
     | <identifier_expression>
     | <parenthesis_expression>
     | <call_expression>
+    | <member_access_expression>
+    | <member_call_expression>
+    | <array_subscript_expression>
+    | <cast_expression>
+    | <check_cast_expression>
+
+<array_subscript_expression> ::= <primary_expression> "[" <expression> "]"
+<member_access_expression> ::= <primary_expression> "." <identifier_literal>
+<member_call_expression> ::= <primary_expression> "." <identifier_literal> "(" (<expression> ("," <expression>)*)? ")"
+<cast_expression> ::= <primary_expression> ">-" <type_identifier>
+<check_cast_expression> ::= <primary_expression> ">-" "{" <identifier_literal> ":" <type_identifier> "}"
 
 <call_expression> ::= <identifier_literal> "(" (<expression> ("," <expression>)*)? ")"
 <parenthesis_expression> ::= "(" <expression> ")"
