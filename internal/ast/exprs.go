@@ -105,6 +105,20 @@ type CastExpr struct {
 	CastToType string
 }
 
+type PrefixExpr struct {
+	StartToken *lexer.Token
+
+	Op    *lexer.Token
+	Right Expr
+}
+
+type PostfixExpr struct {
+	StartToken *lexer.Token
+
+	Left  Expr
+	Op    *lexer.Token
+}
+
 type BinaryExpr struct {
 	StartToken *lexer.Token
 
@@ -124,6 +138,8 @@ func (c *CallExpr) AstNode()           {}
 func (a *ArraySubscriptExpr) AstNode() {}
 func (m *MemberAccessExpr) AstNode()   {}
 func (c *CastExpr) AstNode()           {}
+func (b *PrefixExpr) AstNode()         {}
+func (b *PostfixExpr) AstNode()        {}
 func (b *BinaryExpr) AstNode()         {}
 
 func (b *BoolExpr) FirstToken() *lexer.Token           { return b.StartToken }
@@ -137,6 +153,8 @@ func (c *CallExpr) FirstToken() *lexer.Token           { return c.StartToken }
 func (a *ArraySubscriptExpr) FirstToken() *lexer.Token { return a.StartToken }
 func (m *MemberAccessExpr) FirstToken() *lexer.Token   { return m.StartToken }
 func (c *CastExpr) FirstToken() *lexer.Token           { return c.StartToken }
+func (b *PrefixExpr) FirstToken() *lexer.Token         { return b.StartToken }
+func (b *PostfixExpr) FirstToken() *lexer.Token        { return b.StartToken }
 func (b *BinaryExpr) FirstToken() *lexer.Token         { return b.StartToken }
 
 func (b *BoolExpr) ExprNode()           {}
@@ -150,4 +168,6 @@ func (c *CallExpr) ExprNode()           {}
 func (a *ArraySubscriptExpr) ExprNode() {}
 func (m *MemberAccessExpr) ExprNode()   {}
 func (c *CastExpr) ExprNode()           {}
+func (b *PrefixExpr) ExprNode()         {}
+func (b *PostfixExpr) ExprNode()        {}
 func (b *BinaryExpr) ExprNode()         {}
