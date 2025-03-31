@@ -152,7 +152,7 @@ func (l *Lexer) isCurrDigit() bool {
 
 func (l *Lexer) isCurrPunctuation() bool {
 	switch l.read() {
-	case '+', '-', '*', '/', '%', '=', '!', '<', '>', '&', '|', '^', '(', ')', '[', ']', '{', '}', ':', ';', '.', ',', '?':
+	case '+', '-', '*', '/', '%', '=', '!', '<', '>', '&', '|', '^', '(', ')', '[', ']', '{', '}', ':', ';', '.', ',', '?', '~':
 		return true
 	}
 	return false
@@ -1484,6 +1484,17 @@ func (l *Lexer) processPunctuation() *Token {
 		return &Token{
 			Kind:  QMARK,
 			Value: "?",
+			Metadata: TokenMetadata{
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
+			},
+		}
+	case '~':
+		return &Token{
+			Kind:  TILDE,
+			Value: "~",
 			Metadata: TokenMetadata{
 				FileName: l.fileName,
 				Line:     l.line,

@@ -77,6 +77,7 @@ const (
 	CAST       // >-
 	XMARK      // !
 	QMARK      // ?
+	TILDE      // ~
 
 	PACKAGE
 	EXPORT
@@ -216,6 +217,8 @@ func (tk TokenKind) String() string {
 		return "XMARK"
 	case QMARK:
 		return "QMARK"
+	case TILDE:
+		return "TILDE"
 	case PACKAGE:
 		return "PACKAGE"
 	case EXPORT:
