@@ -852,12 +852,85 @@ func (p *Parser) parseTypeIdentifier() string {
 }
 
 func (p *Parser) parseExpr() ast.Expr {
-	left := p.parsePostfixExpr()
+	left := p.parseUnaryExpr()
 	return p.parseBinaryExpr(left, 0)
 }
 
-func (p *Parser) parsePostfixExpr() ast.Expr {
+func (p *Parser) parseUnaryExpr() ast.Expr {
+	if p.isCurrAny(
+		lexer.INC,
+		lexer.DEC,
+		lexer.PLUS,
+		lexer.MINUS,
+		lexer.XMARK,
+		lexer.TILDE,
+		lexer.BAND,
+		lexer.ASTERISK,
+	) {
+		op := p.curr
+		p.read()
+
+		expr := p.parsePrimaryExpr()
+		return &ast.PrefixExpr{
+			StartToken: op,
+
+			Op:    op,
+			Right: expr,
+		}
+	}
+
 	expr := p.parsePrimaryExpr()
+
+	if p.isCurrAny(lexer.INC, lexer.DEC) {
+		op := p.curr
+		p.read()
+
+		return &ast.PostfixExpr{
+			StartToken: op,
+
+			Left: expr,
+			Op:   op,
+		}
+	}
+
+	return expr
+}
+
+func (p *Parser) parsePrimaryExpr() ast.Expr {
+	var expr ast.Expr
+	switch p.curr.Kind {
+	case lexer.LPAREN:
+		expr = p.parseParenExpr()
+	case lexer.IDENT:
+		p.read()
+		if p.curr.Kind == lexer.LPAREN {
+			p.unread()
+			expr = p.parseCallExpr()
+			break
+		}
+
+		if p.isCurrAny(
+			lexer.ASSIGN,
+			lexer.ADD_ASSIGN,
+			lexer.SUB_ASSIGN,
+			lexer.MUL_ASSIGN,
+			lexer.DIV_ASSIGN,
+			lexer.MOD_ASSIGN,
+			lexer.BAND_ASSIGN,
+			lexer.BOR_ASSIGN,
+			lexer.XOR_ASSIGN,
+			lexer.SHR_ASSIGN,
+			lexer.SHL_ASSIGN) {
+			p.unread()
+			expr = p.parseAssignExpr()
+			break
+		}
+
+		p.unread()
+		expr = p.parseIdentExpr()
+	default:
+		expr = p.parseLiteralExpr()
+	}
 
 	for p.scanner.HasTokens() && p.isCurrAny(lexer.DOT, lexer.LBRACKET, lexer.CAST) {
 		switch p.curr.Kind {
@@ -943,40 +1016,6 @@ func (p *Parser) parsePostfixExpr() ast.Expr {
 	return expr
 }
 
-func (p *Parser) parsePrimaryExpr() ast.Expr {
-	switch p.curr.Kind {
-	case lexer.LPAREN:
-		return p.parseParenExpr()
-	case lexer.IDENT:
-		p.read()
-		if p.curr.Kind == lexer.LPAREN {
-			p.unread()
-			return p.parseCallExpr()
-		}
-
-		if p.isCurrAny(
-			lexer.ASSIGN,
-			lexer.ADD_ASSIGN,
-			lexer.SUB_ASSIGN,
-			lexer.MUL_ASSIGN,
-			lexer.DIV_ASSIGN,
-			lexer.MOD_ASSIGN,
-			lexer.BAND_ASSIGN,
-			lexer.BOR_ASSIGN,
-			lexer.XOR_ASSIGN,
-			lexer.SHR_ASSIGN,
-			lexer.SHL_ASSIGN) {
-			p.unread()
-			return p.parseAssignExpr()
-		}
-
-		p.unread()
-		return p.parseIdentExpr()
-	}
-
-	return p.parseLiteralExpr()
-}
-
 func (p *Parser) parseAssignExpr() ast.Expr {
 	ident := p.parseIdentExpr()
 
@@ -1026,7 +1065,7 @@ func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
 		}
 		p.read()
 
-		right := p.parsePostfixExpr()
+		right := p.parseUnaryExpr()
 
 		nextBindingPower, ok := bindingPowerLookup[p.curr.Kind]
 		if !ok || currentBindingPower < nextBindingPower {
