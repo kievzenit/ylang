@@ -82,8 +82,12 @@ type SemanticAnalyzer struct {
 	funcArgs    map[string]argDefinition
 	funcRetType types.Type
 
-	typesMap map[string]types.Type
-	funcsMap map[string]types.FunctionType
+	forwardTypeDeclarations  map[string]*ast.TypeDeclStmt
+	currentlyProcessingTypes map[string]struct{}
+
+	builtinTypesMap map[string]types.Type
+	customTypesMap  map[string]types.Type
+	funcsMap        map[string]types.FunctionType
 
 	loopDepth int
 }
@@ -110,8 +114,12 @@ func NewSemanticAnalyzer(
 		scope:    &scope{variables: make(map[string]varDefinition)},
 		funcArgs: make(map[string]argDefinition),
 
-		typesMap: make(map[string]types.Type),
-		funcsMap: make(map[string]types.FunctionType),
+		builtinTypesMap: make(map[string]types.Type),
+		customTypesMap:  make(map[string]types.Type),
+		funcsMap:        make(map[string]types.FunctionType),
+
+		forwardTypeDeclarations:  make(map[string]*ast.TypeDeclStmt),
+		currentlyProcessingTypes: make(map[string]struct{}),
 	}
 }
 
@@ -125,7 +133,7 @@ func (sa *SemanticAnalyzer) exitScope() {
 
 func (sa *SemanticAnalyzer) Analyze() *hir.FileHir {
 	sa.defineBuiltInTypes()
-	sa.scanTranslationUnitForFunctions()
+	sa.scanTranslationUnitForTopStmts()
 
 	topStmts := sa.analyzeTranslationUnit(sa.translationUnit)
 	funcTypes := make([]types.FunctionType, 0)
@@ -134,54 +142,55 @@ func (sa *SemanticAnalyzer) Analyze() *hir.FileHir {
 	}
 	return &hir.FileHir{
 		FuncPrototypes: funcTypes,
+		Types:          sa.customTypesMap,
 		Stmts:          topStmts,
 	}
 }
 
 func (sa *SemanticAnalyzer) defineBuiltInTypes() {
-	sa.typesMap["bool"] = &types.BoolType{}
+	sa.builtinTypesMap["bool"] = &types.BoolType{}
 
-	sa.typesMap["i8"] = &types.IntType{
+	sa.builtinTypesMap["i8"] = &types.IntType{
 		Signed: true,
 		Bits:   8,
 	}
-	sa.typesMap["i16"] = &types.IntType{
+	sa.builtinTypesMap["i16"] = &types.IntType{
 		Signed: true,
 		Bits:   16,
 	}
-	sa.typesMap["i32"] = &types.IntType{
+	sa.builtinTypesMap["i32"] = &types.IntType{
 		Signed: true,
 		Bits:   32,
 	}
-	sa.typesMap["i64"] = &types.IntType{
+	sa.builtinTypesMap["i64"] = &types.IntType{
 		Signed: true,
 		Bits:   64,
 	}
-	sa.typesMap["i128"] = &types.IntType{
+	sa.builtinTypesMap["i128"] = &types.IntType{
 		Signed: true,
 		Bits:   128,
 	}
-	sa.typesMap["u1"] = &types.IntType{
+	sa.builtinTypesMap["u1"] = &types.IntType{
 		Signed: false,
 		Bits:   1,
 	}
-	sa.typesMap["u8"] = &types.IntType{
+	sa.builtinTypesMap["u8"] = &types.IntType{
 		Signed: false,
 		Bits:   8,
 	}
-	sa.typesMap["u16"] = &types.IntType{
+	sa.builtinTypesMap["u16"] = &types.IntType{
 		Signed: false,
 		Bits:   16,
 	}
-	sa.typesMap["u32"] = &types.IntType{
+	sa.builtinTypesMap["u32"] = &types.IntType{
 		Signed: false,
 		Bits:   32,
 	}
-	sa.typesMap["u64"] = &types.IntType{
+	sa.builtinTypesMap["u64"] = &types.IntType{
 		Signed: false,
 		Bits:   64,
 	}
-	sa.typesMap["u128"] = &types.IntType{
+	sa.builtinTypesMap["u128"] = &types.IntType{
 		Signed: false,
 		Bits:   128,
 	}
@@ -189,29 +198,31 @@ func (sa *SemanticAnalyzer) defineBuiltInTypes() {
 	// sa.typesMap["f16"] = &types.FloatType{
 	// 	Bits: 16,
 	// }
-	sa.typesMap["f32"] = &types.FloatType{
+	sa.builtinTypesMap["f32"] = &types.FloatType{
 		Bits: 32,
 	}
-	sa.typesMap["f64"] = &types.FloatType{
+	sa.builtinTypesMap["f64"] = &types.FloatType{
 		Bits: 64,
 	}
-	sa.typesMap["f80"] = &types.FloatType{
+	sa.builtinTypesMap["f80"] = &types.FloatType{
 		Bits: 80,
 	}
-	sa.typesMap["f128"] = &types.FloatType{
+	sa.builtinTypesMap["f128"] = &types.FloatType{
 		Bits: 128,
 	}
 
-	sa.typesMap["void"] = &types.VoidType{}
+	sa.builtinTypesMap["void"] = &types.VoidType{}
 }
 
-func (sa *SemanticAnalyzer) scanTranslationUnitForFunctions() {
+func (sa *SemanticAnalyzer) scanTranslationUnitForTopStmts() {
+	sa.forwardTypeDeclarations = make(map[string]*ast.TypeDeclStmt)
+
 	// TODO: change func decl stmt to have tokens for return type and for all args
 	for _, topStmt := range sa.translationUnit.Stmts {
 		switch topStmt.(type) {
 		case *ast.FuncDeclStmt:
 			funcDeclStmt := topStmt.(*ast.FuncDeclStmt)
-			returnType, ok := sa.typesMap[funcDeclStmt.ReturnType]
+			returnType, ok := sa.builtinTypesMap[funcDeclStmt.ReturnType]
 			if !ok {
 				sa.eh.AddError(
 					newSemanticError(
@@ -228,7 +239,7 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFunctions() {
 
 			args := make([]types.FunctionArgType, 0)
 			for _, arg := range funcDeclStmt.Args {
-				argType, ok := sa.typesMap[arg.Type]
+				argType, ok := sa.builtinTypesMap[arg.Type]
 				if !ok {
 					sa.eh.AddError(
 						newSemanticError(
@@ -240,7 +251,7 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFunctions() {
 					)
 				}
 
-				if argType == sa.typesMap["void"] {
+				if argType == sa.builtinTypesMap["void"] {
 					sa.eh.AddError(
 						newSemanticError(
 							"argument cannot be of type void",
@@ -263,16 +274,122 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFunctions() {
 				ReturnType: returnType,
 				Extern:     funcDeclStmt.Extern,
 			}
+		case *ast.TypeDeclStmt:
+			typeDeclStmt := topStmt.(*ast.TypeDeclStmt)
+
+			_, exists := sa.builtinTypesMap[typeDeclStmt.Name]
+			if exists {
+				sa.eh.AddError(
+					newSemanticError(
+						fmt.Sprintf("cannot define type %s, because builtin type with this name exist", typeDeclStmt.Name),
+						typeDeclStmt.StartToken.Metadata.FileName,
+						typeDeclStmt.StartToken.Metadata.Line,
+						typeDeclStmt.StartToken.Metadata.Column,
+					),
+				)
+				continue
+			}
+
+			_, exists = sa.forwardTypeDeclarations[typeDeclStmt.Name]
+			if exists {
+				sa.eh.AddError(
+					newSemanticError(
+						fmt.Sprintf("type %s already defined", typeDeclStmt.Name),
+						typeDeclStmt.StartToken.Metadata.FileName,
+						typeDeclStmt.StartToken.Metadata.Line,
+						typeDeclStmt.StartToken.Metadata.Column,
+					),
+				)
+				continue
+			}
+
+			sa.forwardTypeDeclarations[typeDeclStmt.Name] = typeDeclStmt
 		default:
 			continue
 		}
 	}
+
+	for _, typeDeclStmt := range sa.forwardTypeDeclarations {
+		sa.analyzeTypeDeclStmt(typeDeclStmt)
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) types.Type {
+	if userType, ok := sa.customTypesMap[typeDeclStmt.Name]; ok {
+		return userType
+	}
+
+	sa.currentlyProcessingTypes[typeDeclStmt.Name] = struct{}{}
+	members := make(map[string]types.Type)
+
+	for _, member := range typeDeclStmt.Members {
+		memberType, ok := sa.builtinTypesMap[member.Type]
+		switch {
+		case ok && memberType == sa.builtinTypesMap["void"]:
+			sa.eh.AddError(
+				newSemanticError(
+					"member cannot be of type void",
+					typeDeclStmt.StartToken.Metadata.FileName,
+					typeDeclStmt.StartToken.Metadata.Line,
+					typeDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		case ok && memberType != sa.builtinTypesMap["void"]:
+			members[member.Name] = memberType
+			continue
+		}
+
+		memberTypeDeclStmt, ok := sa.forwardTypeDeclarations[member.Type]
+		if !ok {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("type %s not defined", member.Type),
+					typeDeclStmt.StartToken.Metadata.FileName,
+					typeDeclStmt.StartToken.Metadata.Line,
+					typeDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		}
+
+		if _, ok := sa.currentlyProcessingTypes[member.Type]; ok {
+			for typeName := range sa.currentlyProcessingTypes {
+				typeDeclStmt, _ := sa.forwardTypeDeclarations[typeName]
+				sa.eh.AddError(
+					newSemanticError(
+						fmt.Sprintf("type %s is recursively defined", typeDeclStmt.Name),
+						typeDeclStmt.StartToken.Metadata.FileName,
+						typeDeclStmt.StartToken.Metadata.Line,
+						typeDeclStmt.StartToken.Metadata.Column,
+					),
+				)
+			}
+			continue
+		}
+
+		memberType = sa.analyzeTypeDeclStmt(memberTypeDeclStmt)
+		members[member.Name] = memberType
+	}
+
+	userType := &types.UserType{
+		Name:    typeDeclStmt.Name,
+		Members: members,
+	}
+	sa.customTypesMap[userType.Name] = userType
+	delete(sa.currentlyProcessingTypes, typeDeclStmt.Name)
+	return userType
 }
 
 func (sa *SemanticAnalyzer) analyzeTranslationUnit(translationUnit ast.TranslationUnit) []hir.TopStmtHir {
 	topStmts := make([]hir.TopStmtHir, 0)
 	for _, topStmt := range translationUnit.Stmts {
-		topStmts = append(topStmts, sa.analyzeTopStmt(topStmt))
+		topStmtHir := sa.analyzeTopStmt(topStmt)
+		if topStmtHir == nil {
+			continue
+		}
+
+		topStmts = append(topStmts, topStmtHir)
 	}
 
 	return topStmts
@@ -284,6 +401,8 @@ func (sa *SemanticAnalyzer) analyzeTopStmt(topStmt ast.TopStmt) hir.TopStmtHir {
 		return sa.analyzeFuncDeclStmt(topStmt.(*ast.FuncDeclStmt))
 	case *ast.VarDeclStmt:
 		return sa.analyzeVarDeclStmt(topStmt.(*ast.VarDeclStmt))
+	case *ast.TypeDeclStmt:
+		return nil
 	default:
 		panic("not implemented")
 	}
@@ -338,7 +457,7 @@ func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt) 
 		lastStmt = funcScope.Stmts[len(funcScope.Stmts)-1]
 	}
 	if _, ok := lastStmt.(*hir.ReturnStmtHir); !ok {
-		if functionType.ReturnType != sa.typesMap["void"] {
+		if functionType.ReturnType != sa.builtinTypesMap["void"] {
 			sa.eh.AddError(
 				newSemanticError(
 					"function must return a value",
@@ -424,8 +543,8 @@ func (sa *SemanticAnalyzer) analyzeIfStmt(ifStmt *ast.IfStmt) *hir.IfStmtHir {
 		return nil
 	}
 
-	condExpr = sa.tryImplicitCast(condExpr, sa.typesMap["bool"])
-	if condExpr.ExprType() != sa.typesMap["bool"] {
+	condExpr = sa.tryImplicitCast(condExpr, sa.builtinTypesMap["bool"])
+	if condExpr.ExprType() != sa.builtinTypesMap["bool"] {
 		failed = true
 		sa.eh.AddError(
 			newSemanticError(
@@ -448,8 +567,8 @@ func (sa *SemanticAnalyzer) analyzeIfStmt(ifStmt *ast.IfStmt) *hir.IfStmtHir {
 			continue
 		}
 
-		elseIfCond = sa.tryImplicitCast(elseIfCond, sa.typesMap["bool"])
-		if elseIfCond.ExprType() != sa.typesMap["bool"] {
+		elseIfCond = sa.tryImplicitCast(elseIfCond, sa.builtinTypesMap["bool"])
+		if elseIfCond.ExprType() != sa.builtinTypesMap["bool"] {
 			failed = true
 			sa.eh.AddError(
 				newSemanticError(
@@ -516,8 +635,8 @@ func (sa *SemanticAnalyzer) analyzeWhileStmt(whileStmt *ast.WhileStmt) *hir.Whil
 		return nil
 	}
 
-	condExpr = sa.tryImplicitCast(condExpr, sa.typesMap["bool"])
-	if condExpr.ExprType() != sa.typesMap["bool"] {
+	condExpr = sa.tryImplicitCast(condExpr, sa.builtinTypesMap["bool"])
+	if condExpr.ExprType() != sa.builtinTypesMap["bool"] {
 		sa.eh.AddError(
 			newSemanticError(
 				"while condition must be of type bool",
@@ -548,8 +667,8 @@ func (sa *SemanticAnalyzer) analyzeDoWhileStmt(doWhileStmt *ast.DoWhileStmt) *hi
 		return nil
 	}
 
-	condExpr = sa.tryImplicitCast(condExpr, sa.typesMap["bool"])
-	if condExpr.ExprType() != sa.typesMap["bool"] {
+	condExpr = sa.tryImplicitCast(condExpr, sa.builtinTypesMap["bool"])
+	if condExpr.ExprType() != sa.builtinTypesMap["bool"] {
 		sa.eh.AddError(
 			newSemanticError(
 				"do while condition must be of type bool",
@@ -603,8 +722,8 @@ func (sa *SemanticAnalyzer) analyzeForStmt(forStmt *ast.ForStmt) *hir.ForStmtHir
 	}
 
 	if !hir.IsNilExpr(condExpr) {
-		condExpr = sa.tryImplicitCast(condExpr, sa.typesMap["bool"])
-		if condExpr.ExprType() != sa.typesMap["bool"] {
+		condExpr = sa.tryImplicitCast(condExpr, sa.builtinTypesMap["bool"])
+		if condExpr.ExprType() != sa.builtinTypesMap["bool"] {
 			sa.eh.AddError(
 				newSemanticError(
 					"for condition must be of type bool",
@@ -647,7 +766,7 @@ func (sa *SemanticAnalyzer) analyzeForStmt(forStmt *ast.ForStmt) *hir.ForStmtHir
 
 func (sa *SemanticAnalyzer) analyzeReturnStmt(returnStmt *ast.ReturnStmt) *hir.ReturnStmtHir {
 	if returnStmt.Expr == nil {
-		if sa.funcRetType != sa.typesMap["void"] {
+		if sa.funcRetType != sa.builtinTypesMap["void"] {
 			sa.eh.AddError(
 				newSemanticError(
 					"function must return a value",
@@ -766,7 +885,7 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 		return nil
 	}
 
-	if valueExpr.ExprType() == sa.typesMap["void"] {
+	if valueExpr.ExprType() == sa.builtinTypesMap["void"] {
 		sa.eh.AddError(
 			newSemanticError(
 				"variable cannot be of type void",
@@ -779,7 +898,7 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 	}
 
 	if varDeclStmt.ExplicitType != "" {
-		varExplicitType, ok := sa.typesMap[varDeclStmt.ExplicitType]
+		varExplicitType, ok := sa.builtinTypesMap[varDeclStmt.ExplicitType]
 		if !ok {
 			sa.eh.AddError(
 				newSemanticError(
@@ -792,7 +911,7 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 			return nil
 		}
 
-		if varExplicitType == sa.typesMap["void"] {
+		if varExplicitType == sa.builtinTypesMap["void"] {
 			sa.eh.AddError(
 				newSemanticError(
 					"variable cannot be of type void",
@@ -902,7 +1021,7 @@ func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.B
 	var binExprType types.Type
 	switch binaryExpr.Op.Kind {
 	case lexer.LAND, lexer.LOR:
-		if left.ExprType() != sa.typesMap["bool"] {
+		if left.ExprType() != sa.builtinTypesMap["bool"] {
 			sa.eh.AddError(
 				newSemanticError(
 					"logical operator operands must be of type bool",
@@ -913,9 +1032,9 @@ func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.B
 			)
 			return nil
 		}
-		binExprType = sa.typesMap["bool"]
+		binExprType = sa.builtinTypesMap["bool"]
 	case lexer.EQ, lexer.NEQ, lexer.LT, lexer.GT, lexer.GEQ, lexer.LEQ:
-		binExprType = sa.typesMap["bool"]
+		binExprType = sa.builtinTypesMap["bool"]
 	default:
 		binExprType = left.ExprType()
 	}
@@ -1148,13 +1267,13 @@ func (sa *SemanticAnalyzer) analyzeIdentExpr(identExpr *ast.IdentExpr) hir.ExprH
 func (sa *SemanticAnalyzer) analyzeIntExpr(intExpr *ast.IntExpr) *hir.IntExprHir {
 	if intExpr.ExplicitType == "" {
 		return &hir.IntExprHir{
-			Type:  sa.typesMap["i32"],
+			Type:  sa.builtinTypesMap["i32"],
 			Value: intExpr.Value,
 		}
 	}
 
 	return &hir.IntExprHir{
-		Type:  sa.typesMap[string(intExpr.ExplicitType)],
+		Type:  sa.builtinTypesMap[string(intExpr.ExplicitType)],
 		Value: intExpr.Value,
 	}
 }
@@ -1162,20 +1281,20 @@ func (sa *SemanticAnalyzer) analyzeIntExpr(intExpr *ast.IntExpr) *hir.IntExprHir
 func (sa *SemanticAnalyzer) analyzeFloatExpr(floatExpr *ast.FloatExpr) *hir.FloatExprHir {
 	if floatExpr.ExplicitType == ast.FloatNone {
 		return &hir.FloatExprHir{
-			Type:  sa.typesMap["f32"],
+			Type:  sa.builtinTypesMap["f32"],
 			Value: floatExpr.Value,
 		}
 	}
 
 	return &hir.FloatExprHir{
-		Type:  sa.typesMap[string(floatExpr.ExplicitType)],
+		Type:  sa.builtinTypesMap[string(floatExpr.ExplicitType)],
 		Value: floatExpr.Value,
 	}
 }
 
 func (sa *SemanticAnalyzer) analyzeBoolExpr(boolExpr *ast.BoolExpr) *hir.BoolExprHir {
 	return &hir.BoolExprHir{
-		Type:  sa.typesMap["bool"],
+		Type:  sa.builtinTypesMap["bool"],
 		Value: boolExpr.Value,
 	}
 }
@@ -1186,7 +1305,7 @@ func (sa *SemanticAnalyzer) analyzeCastExpr(castExpr *ast.CastExpr) hir.ExprHir 
 		return nil
 	}
 
-	newType, ok := sa.typesMap[castExpr.CastToType]
+	newType, ok := sa.builtinTypesMap[castExpr.CastToType]
 	if !ok {
 		sa.eh.AddError(
 			newSemanticError(
