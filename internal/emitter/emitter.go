@@ -78,6 +78,34 @@ func (e *Emitter) declareTypes() {
 	e.typesMap["f128"] = e.context.FP128Type()
 
 	e.typesMap["void"] = e.context.VoidType()
+
+	for _, userType := range e.fileHir.Types {
+		e.emitForType(userType.(*hir_types.UserType))
+	}
+}
+
+func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
+	customStruct := e.context.StructCreateNamed(userType.Name)
+	fieldTypes := make([]llvm.Type, 0)
+	for _, member := range userType.Members {
+		llvmType, exists := e.typesMap[member.Type()]
+		if exists {
+			fieldTypes = append(fieldTypes, llvmType)
+			continue
+		}
+
+		innerUserType, ok := member.(*hir_types.UserType)
+		if !ok {
+			panic("type should be either builtin or user type, this was not")
+		}
+
+		innerStruct := e.emitForType(innerUserType)
+		fieldTypes = append(fieldTypes, innerStruct)
+	}
+	customStruct.StructSetBody(fieldTypes, false)
+	e.typesMap[userType.Name] = customStruct
+
+	return customStruct
 }
 
 func (e *Emitter) declareFuncPrototypes() {
