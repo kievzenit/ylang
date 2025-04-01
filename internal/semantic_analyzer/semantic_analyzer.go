@@ -104,6 +104,18 @@ func (sa *SemanticAnalyzer) inLoop() bool {
 	return sa.loopDepth > 0
 }
 
+func (sa *SemanticAnalyzer) getType(name string) (types.Type, bool) {
+	if t, ok := sa.builtinTypesMap[name]; ok {
+		return t, true
+	}
+
+	if t, ok := sa.customTypesMap[name]; ok {
+		return t, true
+	}
+
+	return nil, false
+}
+
 func NewSemanticAnalyzer(
 	eh compiler_errors.ErrorHandler,
 	translationUnit ast.TranslationUnit) *SemanticAnalyzer {
@@ -133,7 +145,8 @@ func (sa *SemanticAnalyzer) exitScope() {
 
 func (sa *SemanticAnalyzer) Analyze() *hir.FileHir {
 	sa.defineBuiltInTypes()
-	sa.scanTranslationUnitForTopStmts()
+	sa.scanTranslationUnitForTypeDeclStmts()
+	sa.scanTranslationUnitForFuncDeclStmts()
 
 	topStmts := sa.analyzeTranslationUnit(sa.translationUnit)
 	funcTypes := make([]types.FunctionType, 0)
@@ -214,103 +227,105 @@ func (sa *SemanticAnalyzer) defineBuiltInTypes() {
 	sa.builtinTypesMap["void"] = &types.VoidType{}
 }
 
-func (sa *SemanticAnalyzer) scanTranslationUnitForTopStmts() {
+func (sa *SemanticAnalyzer) scanTranslationUnitForTypeDeclStmts() {
 	sa.forwardTypeDeclarations = make(map[string]*ast.TypeDeclStmt)
 
-	// TODO: change func decl stmt to have tokens for return type and for all args
 	for _, topStmt := range sa.translationUnit.Stmts {
-		switch topStmt.(type) {
-		case *ast.FuncDeclStmt:
-			funcDeclStmt := topStmt.(*ast.FuncDeclStmt)
-			returnType, ok := sa.builtinTypesMap[funcDeclStmt.ReturnType]
-			if !ok {
-				sa.eh.AddError(
-					newSemanticError(
-						fmt.Sprintf("return type %s not defined", funcDeclStmt.ReturnType),
-						"",
-						0,
-						0,
-						// topStmt.StartToken.Metadata.FileName,
-						// topStmt.StartToken.Metadata.Line,
-						// topStmt.StartToken.Metadata.Column,
-					),
-				)
-			}
-
-			args := make([]types.FunctionArgType, 0)
-			for _, arg := range funcDeclStmt.Args {
-				argType, ok := sa.builtinTypesMap[arg.Type]
-				if !ok {
-					sa.eh.AddError(
-						newSemanticError(
-							fmt.Sprintf("argument type %s not defined", arg.Type),
-							"",
-							0,
-							0,
-						),
-					)
-				}
-
-				if argType == sa.builtinTypesMap["void"] {
-					sa.eh.AddError(
-						newSemanticError(
-							"argument cannot be of type void",
-							"",
-							0,
-							0,
-						),
-					)
-				}
-
-				args = append(args, types.FunctionArgType{
-					Name: arg.Name,
-					Type: argType,
-				})
-			}
-
-			sa.funcsMap[funcDeclStmt.Name] = types.FunctionType{
-				Name:       funcDeclStmt.Name,
-				Args:       args,
-				ReturnType: returnType,
-				Extern:     funcDeclStmt.Extern,
-			}
-		case *ast.TypeDeclStmt:
-			typeDeclStmt := topStmt.(*ast.TypeDeclStmt)
-
-			_, exists := sa.builtinTypesMap[typeDeclStmt.Name]
-			if exists {
-				sa.eh.AddError(
-					newSemanticError(
-						fmt.Sprintf("cannot define type %s, because builtin type with this name exist", typeDeclStmt.Name),
-						typeDeclStmt.StartToken.Metadata.FileName,
-						typeDeclStmt.StartToken.Metadata.Line,
-						typeDeclStmt.StartToken.Metadata.Column,
-					),
-				)
-				continue
-			}
-
-			_, exists = sa.forwardTypeDeclarations[typeDeclStmt.Name]
-			if exists {
-				sa.eh.AddError(
-					newSemanticError(
-						fmt.Sprintf("type %s already defined", typeDeclStmt.Name),
-						typeDeclStmt.StartToken.Metadata.FileName,
-						typeDeclStmt.StartToken.Metadata.Line,
-						typeDeclStmt.StartToken.Metadata.Column,
-					),
-				)
-				continue
-			}
-
-			sa.forwardTypeDeclarations[typeDeclStmt.Name] = typeDeclStmt
-		default:
+		typeDeclStmt, ok := topStmt.(*ast.TypeDeclStmt)
+		if !ok {
 			continue
 		}
+
+		_, exists := sa.builtinTypesMap[typeDeclStmt.Name]
+		if exists {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("cannot define type %s, because builtin type with this name exist", typeDeclStmt.Name),
+					typeDeclStmt.StartToken.Metadata.FileName,
+					typeDeclStmt.StartToken.Metadata.Line,
+					typeDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		}
+
+		_, exists = sa.forwardTypeDeclarations[typeDeclStmt.Name]
+		if exists {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("type %s already defined", typeDeclStmt.Name),
+					typeDeclStmt.StartToken.Metadata.FileName,
+					typeDeclStmt.StartToken.Metadata.Line,
+					typeDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		}
+
+		sa.forwardTypeDeclarations[typeDeclStmt.Name] = typeDeclStmt
 	}
 
 	for _, typeDeclStmt := range sa.forwardTypeDeclarations {
 		sa.analyzeTypeDeclStmt(typeDeclStmt)
+	}
+}
+
+func (sa *SemanticAnalyzer) scanTranslationUnitForFuncDeclStmts() {
+	for _, topStmt := range sa.translationUnit.Stmts {
+		funcDeclStmt, ok := topStmt.(*ast.FuncDeclStmt)
+		if !ok {
+			continue
+		}
+
+		returnType, ok := sa.getType(funcDeclStmt.ReturnType)
+		if !ok {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("return type %s not defined", funcDeclStmt.ReturnType),
+					funcDeclStmt.StartToken.Metadata.FileName,
+					funcDeclStmt.StartToken.Metadata.Line,
+					funcDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+		}
+
+		args := make([]types.FunctionArgType, 0)
+		for _, arg := range funcDeclStmt.Args {
+			argType, ok := sa.getType(arg.Type)
+			if !ok {
+				sa.eh.AddError(
+					newSemanticError(
+						fmt.Sprintf("argument type %s not defined", arg.Type),
+						funcDeclStmt.StartToken.Metadata.FileName,
+						funcDeclStmt.StartToken.Metadata.Line,
+						funcDeclStmt.StartToken.Metadata.Column,
+					),
+				)
+			}
+
+			if argType == sa.builtinTypesMap["void"] {
+				sa.eh.AddError(
+					newSemanticError(
+						"argument cannot be of type void",
+						funcDeclStmt.StartToken.Metadata.FileName,
+						funcDeclStmt.StartToken.Metadata.Line,
+						funcDeclStmt.StartToken.Metadata.Column,
+					),
+				)
+			}
+
+			args = append(args, types.FunctionArgType{
+				Name: arg.Name,
+				Type: argType,
+			})
+		}
+
+		sa.funcsMap[funcDeclStmt.Name] = types.FunctionType{
+			Name:       funcDeclStmt.Name,
+			Args:       args,
+			ReturnType: returnType,
+			Extern:     funcDeclStmt.Extern,
+		}
 	}
 }
 
@@ -323,7 +338,7 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 	members := make(map[string]types.Type)
 
 	for _, member := range typeDeclStmt.Members {
-		memberType, ok := sa.builtinTypesMap[member.Type]
+		memberType, ok := sa.getType(member.Type)
 		switch {
 		case ok && memberType == sa.builtinTypesMap["void"]:
 			sa.eh.AddError(
@@ -898,7 +913,7 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 	}
 
 	if varDeclStmt.ExplicitType != "" {
-		varExplicitType, ok := sa.builtinTypesMap[varDeclStmt.ExplicitType]
+		varExplicitType, ok := sa.getType(varDeclStmt.ExplicitType)
 		if !ok {
 			sa.eh.AddError(
 				newSemanticError(
