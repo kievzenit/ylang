@@ -828,6 +828,30 @@ func (p *Parser) parseExprStmt(expectSemicolon bool) ast.Stmt {
 	}
 }
 
+func (p *Parser) parseBaseTypeIdentifier() string {
+	var typeName string
+
+	p.expect(lexer.IDENT)
+	typeName = p.curr.Value
+	p.read()
+
+	for p.scanner.HasTokens() && p.curr.Kind == lexer.COLONCOLON {
+		p.read()
+
+		p.expectAny(lexer.IDENT, lexer.LBRACE, lexer.LPAREN)
+		switch p.curr.Kind {
+		case lexer.LBRACE, lexer.LPAREN:
+			p.unread()
+			return typeName
+		case lexer.IDENT:
+			typeName += "::" + p.curr.Value
+			p.read()
+		}
+	}
+
+	return typeName
+}
+
 func (p *Parser) parseTypeIdentifier() string {
 	var typeName string
 	for p.scanner.HasTokens() && p.curr.Kind == lexer.LBRACKET {
@@ -844,9 +868,7 @@ func (p *Parser) parseTypeIdentifier() string {
 		p.read()
 	}
 
-	p.expect(lexer.IDENT)
-	typeName += p.curr.Value
-	p.read()
+	typeName += p.parseBaseTypeIdentifier()
 
 	return typeName
 }
@@ -906,6 +928,12 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 		if p.curr.Kind == lexer.LPAREN {
 			p.unread()
 			expr = p.parseCallExpr()
+			break
+		}
+
+		if p.curr.Kind == lexer.COLONCOLON {
+			p.unread()
+			expr = p.parseTypeExpr()
 			break
 		}
 
@@ -1054,6 +1082,89 @@ func (p *Parser) parseParenExpr() ast.Expr {
 	p.read()
 
 	return expr
+}
+
+func (p *Parser) parseTypeExpr() ast.Expr {
+	startToken := p.curr
+	typeName := p.parseBaseTypeIdentifier()
+
+	p.expect(lexer.COLONCOLON)
+	p.read()
+
+	p.expectAny(lexer.LBRACE, lexer.LPAREN)
+	switch p.curr.Kind {
+	case lexer.LBRACE:
+		return p.parseTypeInstantiationExpr(typeName, startToken)
+	case lexer.LPAREN:
+		return p.parseTypeConstructionExpr(typeName, startToken)
+	default:
+		panic("unreachable")
+	}
+}
+
+func (p *Parser) parseTypeInstantiationExpr(
+	typeName string,
+	startToken *lexer.Token,
+) *ast.TypeInstantiationExpr {
+	p.expect(lexer.LBRACE)
+	p.read()
+
+	instantiations := make([]ast.TypeMemberInstantiation, 0)
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.RBRACE {
+		p.expect(lexer.IDENT)
+		memberName := p.curr.Value
+		p.read()
+
+		p.expect(lexer.ASSIGN)
+		p.read()
+
+		instantiationExpr := p.parseExpr()
+
+		instantiations = append(instantiations, ast.TypeMemberInstantiation{
+			Name: memberName,
+			Expr: instantiationExpr,
+		})
+
+		if p.curr.Kind == lexer.COMMA {
+			p.read()
+		}
+	}
+
+	p.expect(lexer.RBRACE)
+	p.read()
+
+	return &ast.TypeInstantiationExpr{
+		StartToken: startToken,
+
+		TypeName:       typeName,
+		Instantiations: instantiations,
+	}
+}
+
+func (p *Parser) parseTypeConstructionExpr(
+	typeName string,
+	startToken *lexer.Token,
+) *ast.TypeConstructionExpr {
+	p.expect(lexer.LPAREN)
+	p.read()
+
+	args := make([]ast.Expr, 0)
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.RPAREN {
+		args = append(args, p.parseExpr())
+		if p.curr.Kind == lexer.COMMA {
+			p.read()
+		}
+	}
+
+	p.expect(lexer.RPAREN)
+	p.read()
+
+	return &ast.TypeConstructionExpr{
+		StartToken: startToken,
+
+		TypeName: typeName,
+		Args:     args,
+	}
 }
 
 func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
