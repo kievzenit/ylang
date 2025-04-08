@@ -80,7 +80,7 @@ func (e *Emitter) declareTypes() {
 	e.typesMap["void"] = e.context.VoidType()
 
 	for _, userType := range e.fileHir.Types {
-		e.emitForType(userType.(*hir_types.UserType))
+		e.emitForType(userType)
 	}
 }
 

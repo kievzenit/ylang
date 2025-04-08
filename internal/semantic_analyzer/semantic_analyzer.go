@@ -86,7 +86,7 @@ type SemanticAnalyzer struct {
 	currentlyProcessingTypes map[string]struct{}
 
 	builtinTypesMap map[string]types.Type
-	customTypesMap  map[string]types.Type
+	customTypesMap  map[string]*types.UserType
 	funcsMap        map[string]types.FunctionType
 
 	loopDepth int
@@ -127,7 +127,7 @@ func NewSemanticAnalyzer(
 		funcArgs: make(map[string]argDefinition),
 
 		builtinTypesMap: make(map[string]types.Type),
-		customTypesMap:  make(map[string]types.Type),
+		customTypesMap:  make(map[string]*types.UserType),
 		funcsMap:        make(map[string]types.FunctionType),
 
 		forwardTypeDeclarations:  make(map[string]*ast.TypeDeclStmt),

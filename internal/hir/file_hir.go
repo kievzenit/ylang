@@ -6,6 +6,6 @@ import (
 
 type FileHir struct {
 	FuncPrototypes []types.FunctionType
-	Types          map[string]types.Type
+	Types          map[string]*types.UserType
 	Stmts          []TopStmtHir
 }
