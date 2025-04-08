@@ -336,8 +336,9 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 
 	sa.currentlyProcessingTypes[typeDeclStmt.Name] = struct{}{}
 	members := make(map[string]types.Type)
+	memberPositions := make(map[string]int)
 
-	for _, member := range typeDeclStmt.Members {
+	for position, member := range typeDeclStmt.Members {
 		memberType, ok := sa.getType(member.Type)
 		switch {
 		case ok && memberType == sa.builtinTypesMap["void"]:
@@ -352,6 +353,7 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 			continue
 		case ok && memberType != sa.builtinTypesMap["void"]:
 			members[member.Name] = memberType
+			memberPositions[member.Name] = position
 			continue
 		}
 
@@ -385,11 +387,13 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 
 		memberType = sa.analyzeTypeDeclStmt(memberTypeDeclStmt)
 		members[member.Name] = memberType
+		memberPositions[member.Name] = position
 	}
 
 	userType := &types.UserType{
-		Name:    typeDeclStmt.Name,
-		Members: members,
+		Name:            typeDeclStmt.Name,
+		Members:         members,
+		MemberPositions: memberPositions,
 	}
 	sa.customTypesMap[userType.Name] = userType
 	delete(sa.currentlyProcessingTypes, typeDeclStmt.Name)
@@ -978,6 +982,8 @@ func (sa *SemanticAnalyzer) analyzeExpr(expr ast.Expr) hir.ExprHir {
 		return sa.analyzeBinaryExpr(expr.(*ast.BinaryExpr))
 	case *ast.AssignExpr:
 		return sa.analyzeAssignExpr(expr.(*ast.AssignExpr))
+	case *ast.TypeInstantiationExpr:
+		return sa.analyzeTypeInstantiationExpr(expr.(*ast.TypeInstantiationExpr))
 	case *ast.CallExpr:
 		return sa.analyzeCallExpr(expr.(*ast.CallExpr))
 	case *ast.IdentExpr:

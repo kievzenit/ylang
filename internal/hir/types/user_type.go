@@ -1,8 +1,9 @@
 package hir_types
 
 type UserType struct {
-	Name string
-	Members map[string]Type
+	Name            string
+	Members         map[string]Type
+	MemberPositions map[string]int
 }
 
 func (t *UserType) Type() string {
