@@ -52,6 +52,17 @@ type AssignExprHir struct {
 	Value ExprHir
 }
 
+type TypeMemberInstantiation struct {
+	MemberName string
+	ExprHir
+}
+
+type TypeInstantiationExprHir struct {
+	types.Type
+	TypeName       string
+	Instantiations []TypeMemberInstantiation
+}
+
 type CallExprHir struct {
 	types.Type
 	Name string
@@ -64,14 +75,14 @@ type CastExprHir interface {
 }
 
 type OperatorCastExprHir struct {
-	NewType   types.Type
-	OldType   types.Type
+	NewType types.Type
+	OldType types.Type
 	Expr    ExprHir
 }
 
 type DownCastExprHir struct {
-	NewType   types.Type
-	OldType   types.Type
+	NewType types.Type
+	OldType types.Type
 	Expr    ExprHir
 }
 
@@ -150,29 +161,31 @@ type BinaryExprHir struct {
 	Right ExprHir
 }
 
-func (BoolExprHir) ExprHirNode()         {}
-func (IntExprHir) ExprHirNode()          {}
-func (FloatExprHir) ExprHirNode()        {}
-func (IdentExprHir) ExprHirNode()        {}
-func (ArgIdentExprHir) ExprHirNode()     {}
-func (AssignExprHir) ExprHirNode()       {}
-func (CallExprHir) ExprHirNode()         {}
-func (OperatorCastExprHir) ExprHirNode() {}
-func (DownCastExprHir) ExprHirNode()     {}
-func (UpCastExprHir) ExprHirNode()       {}
-func (BinaryExprHir) ExprHirNode()       {}
+func (BoolExprHir) ExprHirNode()              {}
+func (IntExprHir) ExprHirNode()               {}
+func (FloatExprHir) ExprHirNode()             {}
+func (IdentExprHir) ExprHirNode()             {}
+func (ArgIdentExprHir) ExprHirNode()          {}
+func (AssignExprHir) ExprHirNode()            {}
+func (TypeInstantiationExprHir) ExprHirNode() {}
+func (CallExprHir) ExprHirNode()              {}
+func (OperatorCastExprHir) ExprHirNode()      {}
+func (DownCastExprHir) ExprHirNode()          {}
+func (UpCastExprHir) ExprHirNode()            {}
+func (BinaryExprHir) ExprHirNode()            {}
 
-func (e BoolExprHir) ExprType() types.Type         { return e.Type }
-func (e IntExprHir) ExprType() types.Type          { return e.Type }
-func (e FloatExprHir) ExprType() types.Type        { return e.Type }
-func (e IdentExprHir) ExprType() types.Type        { return e.Type }
-func (e ArgIdentExprHir) ExprType() types.Type     { return e.Type }
-func (e AssignExprHir) ExprType() types.Type       { return e.Type }
-func (e CallExprHir) ExprType() types.Type         { return e.Type }
-func (e OperatorCastExprHir) ExprType() types.Type { return e.NewType }
-func (e DownCastExprHir) ExprType() types.Type     { return e.NewType }
-func (e UpCastExprHir) ExprType() types.Type       { return e.NewType }
-func (e BinaryExprHir) ExprType() types.Type       { return e.Type }
+func (e BoolExprHir) ExprType() types.Type              { return e.Type }
+func (e IntExprHir) ExprType() types.Type               { return e.Type }
+func (e FloatExprHir) ExprType() types.Type             { return e.Type }
+func (e IdentExprHir) ExprType() types.Type             { return e.Type }
+func (e ArgIdentExprHir) ExprType() types.Type          { return e.Type }
+func (e AssignExprHir) ExprType() types.Type            { return e.Type }
+func (e TypeInstantiationExprHir) ExprType() types.Type { return e.Type }
+func (e CallExprHir) ExprType() types.Type              { return e.Type }
+func (e OperatorCastExprHir) ExprType() types.Type      { return e.NewType }
+func (e DownCastExprHir) ExprType() types.Type          { return e.NewType }
+func (e UpCastExprHir) ExprType() types.Type            { return e.NewType }
+func (e BinaryExprHir) ExprType() types.Type            { return e.Type }
 
 func (OperatorCastExprHir) CastExprHirNode() {}
 func (DownCastExprHir) CastExprHirNode()     {}

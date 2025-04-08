@@ -1211,6 +1211,91 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 	}
 }
 
+func (sa *SemanticAnalyzer) analyzeTypeInstantiationExpr(typeInstantiationExpr *ast.TypeInstantiationExpr) *hir.TypeInstantiationExprHir {
+	userType, exists := sa.customTypesMap[typeInstantiationExpr.TypeName]
+	if !exists {
+		sa.eh.AddError(
+			newSemanticError(
+				fmt.Sprintf("type %s not defined", typeInstantiationExpr.TypeName),
+				typeInstantiationExpr.StartToken.Metadata.FileName,
+				typeInstantiationExpr.StartToken.Metadata.Line,
+				typeInstantiationExpr.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	instantiations := make([]hir.TypeMemberInstantiation, 0)
+	membersSet := make(map[string]struct{})
+	failed := false
+	for _, instantiation := range typeInstantiationExpr.Instantiations {
+		memberType, exists := userType.Members[instantiation.Name]
+		if !exists {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("member %s not found in type %s", instantiation.Name, typeInstantiationExpr.TypeName),
+					typeInstantiationExpr.StartToken.Metadata.FileName,
+					typeInstantiationExpr.StartToken.Metadata.Line,
+					typeInstantiationExpr.StartToken.Metadata.Column,
+				),
+			)
+			failed = true
+			continue
+		}
+
+		instantiationExpr := sa.analyzeExpr(instantiation.Expr)
+		if hir.IsNilExpr(instantiationExpr) {
+			failed = true
+			continue
+		}
+
+		instantiationExpr = sa.tryImplicitCast(instantiationExpr, memberType)
+		if memberType != instantiationExpr.ExprType() {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("member %s type mismatch", instantiation.Name),
+					typeInstantiationExpr.StartToken.Metadata.FileName,
+					typeInstantiationExpr.StartToken.Metadata.Line,
+					typeInstantiationExpr.StartToken.Metadata.Column,
+				),
+			)
+			failed = true
+			continue
+		}
+
+		instantiations = append(instantiations, hir.TypeMemberInstantiation{
+			MemberName: instantiation.Name,
+			ExprHir: instantiationExpr,
+		})
+		membersSet[instantiation.Name] = struct{}{}
+	}
+
+	for memberName := range userType.Members {
+		_, exists := membersSet[memberName]
+		if !exists {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("member %s not initialized", memberName),
+					typeInstantiationExpr.StartToken.Metadata.FileName,
+					typeInstantiationExpr.StartToken.Metadata.Line,
+					typeInstantiationExpr.StartToken.Metadata.Column,
+				),
+			)
+			failed = true
+		}
+	}
+
+	if failed {
+		return nil
+	}
+
+	return &hir.TypeInstantiationExprHir{
+		Type:           userType,
+		TypeName:       typeInstantiationExpr.TypeName,
+		Instantiations: instantiations,
+	}
+}
+
 func (sa *SemanticAnalyzer) analyzeCallExpr(callExpr *ast.CallExpr) *hir.CallExprHir {
 	funcType, ok := sa.funcsMap[callExpr.Name]
 	if !ok {
