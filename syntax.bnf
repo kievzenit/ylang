@@ -134,8 +134,8 @@
 
 <type_creation_expression> ::= <type_instantiation_expression> | <type_construction_expression>
 <type_member_instantiation> ::= (<identifier_literal> "=" <expression>)
-<type_instantiation_expression> ::= <type_identifier> "::" "{" (<type_member_instantiation> ("," <type_member_instantiation>)*)? "}"
-<type_construction_expression> ::= <type_identifier> "::" "(" (<expression> ("," <expression>)*)? ")"
+<type_instantiation_expression> ::= <base_type_identifier> "::" "{" (<type_member_instantiation> ("," <type_member_instantiation>)*)? "}"
+<type_construction_expression> ::= <base_type_identifier> "::" "(" (<expression> ("," <expression>)*)? ")"
 
 <literal_expression> ::= <integer_expression> | <float_expression> | <boolean_expression> | <string_expression> | <char_expression>
 <string_expression> ::= <string_literal>
@@ -147,8 +147,11 @@
 <string_literal> ::= "\"" .* "\"" // TODO: escape sequences
 <char_literal> ::= "'" .? "'" // TODO: escape sequences
 
-<type_identifier> ::= <identifier_literal>
+<type_identifier> ::= <base_type_identifier>
     | "[" <integer_literal>? "]" <type_identifier>
+
+<base_type_identifier> ::= <identifier_literal>
+    | <base_type_identifier> "::" <identifier_literal>
 
 <integer_type> ::= "i1"
     | "i8"
