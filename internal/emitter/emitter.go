@@ -162,6 +162,13 @@ func (e *Emitter) declareFuncPrototypes() {
 		funcType := llvm.FunctionType(returnType, argsTypes, false)
 		funcValue := llvm.AddFunction(e.module, funcName, funcType)
 		e.funcsMap[funcName] = funcValue
+
+		framePointerAttr := e.context.CreateStringAttribute("frame-pointer", "all")
+		noTrappingMathAttr := e.context.CreateStringAttribute("no-trapping-math", "true")
+		stackProtectorBufferSizeAttr := e.context.CreateStringAttribute("stack-protector-buffer-size", "8")
+		funcValue.AddFunctionAttr(framePointerAttr)
+		funcValue.AddFunctionAttr(noTrappingMathAttr)
+		funcValue.AddFunctionAttr(stackProtectorBufferSizeAttr)
 	}
 }
 
