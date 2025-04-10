@@ -1,6 +1,8 @@
 package emitter
 
 import (
+	"fmt"
+
 	"github.com/kievzenit/ylang/internal/hir"
 	hir_types "github.com/kievzenit/ylang/internal/hir/types"
 	"tinygo.org/x/go-llvm"
@@ -9,9 +11,10 @@ import (
 type Emitter struct {
 	fileHir *hir.FileHir
 
-	typesMap     map[string]llvm.Type
-	variablesMap map[string]llvm.Value
-	funcsMap     map[string]llvm.Value
+	typesMap         map[string]llvm.Type
+	variablesMap     map[string]llvm.Value
+	funcsMap         map[string]llvm.Value
+	initFunctionsMap map[string]llvm.Value
 
 	context llvm.Context
 	module  llvm.Module
@@ -33,9 +36,10 @@ func NewEmitter(fileHir *hir.FileHir) *Emitter {
 	return &Emitter{
 		fileHir: fileHir,
 
-		typesMap:     make(map[string]llvm.Type),
-		variablesMap: make(map[string]llvm.Value),
-		funcsMap:     make(map[string]llvm.Value),
+		typesMap:         make(map[string]llvm.Type),
+		variablesMap:     make(map[string]llvm.Value),
+		funcsMap:         make(map[string]llvm.Value),
+		initFunctionsMap: make(map[string]llvm.Value),
 
 		context: context,
 		module:  context.NewModule("main"),
@@ -104,6 +108,45 @@ func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
 	}
 	customStruct.StructSetBody(fieldTypes, false)
 	e.typesMap[userType.Name] = customStruct
+
+	initFunctionType := llvm.FunctionType(customStruct, fieldTypes, false)
+	initFunction := llvm.AddFunction(
+		e.module,
+		fmt.Sprintf("compiler::%s::init", userType.Name),
+		initFunctionType)
+	initFunction.SetLinkage(llvm.PrivateLinkage)
+	alwaysInlineAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("alwaysinline"), 0)
+	noCallbackAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nocallback"), 0)
+	noMergeAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nomerge"), 0)
+	noRecurseAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("norecurse"), 0)
+	willReturnAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("willreturn"), 0)
+	noSyncAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nosync"), 0)
+	noUnwindAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nounwind"), 0)
+	initFunction.AddFunctionAttr(alwaysInlineAttr)
+	initFunction.AddFunctionAttr(noCallbackAttr)
+	initFunction.AddFunctionAttr(noMergeAttr)
+	initFunction.AddFunctionAttr(noRecurseAttr)
+	initFunction.AddFunctionAttr(willReturnAttr)
+	initFunction.AddFunctionAttr(noSyncAttr)
+	initFunction.AddFunctionAttr(noUnwindAttr)
+	e.initFunctionsMap[userType.Name] = initFunction
+
+	entryBasicBlock := e.context.AddBasicBlock(initFunction, "entry")
+	e.builder.SetInsertPointAtEnd(entryBasicBlock)
+	initRetAlloca := e.builder.CreateAlloca(customStruct, "inittmp")
+	for memberName := range userType.Members {
+		memberPosition := userType.MemberPositions[memberName]
+		memberGep := e.builder.CreateStructGEP(
+			customStruct,
+			initRetAlloca,
+			memberPosition,
+			fmt.Sprintf("%s::%s", userType.Name, memberName),
+		)
+		e.builder.CreateStore(initFunction.Param(memberPosition), memberGep)
+	}
+
+	loadedRetValue := e.builder.CreateLoad(customStruct, initRetAlloca, "initrettmp")
+	e.builder.CreateRet(loadedRetValue)
 
 	return customStruct
 }
@@ -453,6 +496,8 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 		return e.emitForDownCastExprHir(exprHir.(*hir.DownCastExprHir))
 	case *hir.AssignExprHir:
 		return e.emitForAssignExprHir(exprHir.(*hir.AssignExprHir))
+	case *hir.TypeInstantiationExprHir:
+		return e.emitForTypeInstantiationExprHir(exprHir.(*hir.TypeInstantiationExprHir))
 	case *hir.BinaryExprHir:
 		return e.emitForBinExprHir(exprHir.(*hir.BinaryExprHir))
 	case *hir.IdentExprHir:
@@ -517,6 +562,17 @@ func (e *Emitter) emitForAssignExprHir(assignExprHir *hir.AssignExprHir) llvm.Va
 	value := e.emitForExprHir(assignExprHir.Value)
 	e.builder.CreateStore(value, allocValue)
 	return value
+}
+
+func (e *Emitter) emitForTypeInstantiationExprHir(typeInstantiationExprHir *hir.TypeInstantiationExprHir) llvm.Value {
+	initFunction := e.initFunctionsMap[typeInstantiationExprHir.TypeName]
+
+	args := make([]llvm.Value, len(typeInstantiationExprHir.Instantiations))
+	for _, instantiation := range typeInstantiationExprHir.Instantiations {
+		exprHir := e.emitForExprHir(instantiation.ExprHir)
+		args[instantiation.MemberPosition] = exprHir
+	}
+	return e.builder.CreateCall(initFunction.GlobalValueType(), initFunction, args, "")
 }
 
 func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
