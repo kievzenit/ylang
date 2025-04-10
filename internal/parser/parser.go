@@ -836,17 +836,12 @@ func (p *Parser) parseBaseTypeIdentifier() string {
 	p.read()
 
 	for p.scanner.HasTokens() && p.curr.Kind == lexer.COLONCOLON {
+		typeName += p.curr.Value
 		p.read()
 
-		p.expectAny(lexer.IDENT, lexer.LBRACE, lexer.LPAREN)
-		switch p.curr.Kind {
-		case lexer.LBRACE, lexer.LPAREN:
-			p.unread()
-			return typeName
-		case lexer.IDENT:
-			typeName += "::" + p.curr.Value
-			p.read()
-		}
+		p.expect(lexer.IDENT)
+		typeName += p.curr.Value
+		p.read()
 	}
 
 	return typeName
@@ -931,7 +926,7 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 			break
 		}
 
-		if p.curr.Kind == lexer.COLONCOLON {
+		if p.isCurrAny(lexer.TYPE_INIT, lexer.TYPE_CONSTRUCT) {
 			p.unread()
 			expr = p.parseTypeExpr()
 			break
@@ -1088,14 +1083,11 @@ func (p *Parser) parseTypeExpr() ast.Expr {
 	startToken := p.curr
 	typeName := p.parseBaseTypeIdentifier()
 
-	p.expect(lexer.COLONCOLON)
-	p.read()
-
-	p.expectAny(lexer.LBRACE, lexer.LPAREN)
+	p.expectAny(lexer.TYPE_INIT, lexer.TYPE_CONSTRUCT)
 	switch p.curr.Kind {
-	case lexer.LBRACE:
+	case lexer.TYPE_INIT:
 		return p.parseTypeInstantiationExpr(typeName, startToken)
-	case lexer.LPAREN:
+	case lexer.TYPE_CONSTRUCT:
 		return p.parseTypeConstructionExpr(typeName, startToken)
 	default:
 		panic("unreachable")
@@ -1106,7 +1098,7 @@ func (p *Parser) parseTypeInstantiationExpr(
 	typeName string,
 	startToken *lexer.Token,
 ) *ast.TypeInstantiationExpr {
-	p.expect(lexer.LBRACE)
+	p.expect(lexer.TYPE_INIT)
 	p.read()
 
 	instantiations := make([]ast.TypeMemberInstantiation, 0)
@@ -1145,7 +1137,7 @@ func (p *Parser) parseTypeConstructionExpr(
 	typeName string,
 	startToken *lexer.Token,
 ) *ast.TypeConstructionExpr {
-	p.expect(lexer.LPAREN)
+	p.expect(lexer.TYPE_CONSTRUCT)
 	p.read()
 
 	args := make([]ast.Expr, 0)
