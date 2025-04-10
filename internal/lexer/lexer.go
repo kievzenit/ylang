@@ -1291,7 +1291,22 @@ func (l *Lexer) processColon() *Token {
 		}
 	}
 
-	if l.read() == ':' {
+	if l.read() != ':' {
+		l.unread()
+		return &Token{
+			Kind:  COLON,
+			Value: ":",
+			Metadata: TokenMetadata{
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
+			},
+		}
+	}
+
+	l.advance()
+	if !l.hasChars() {
 		return &Token{
 			Kind:  COLONCOLON,
 			Value: "::",
@@ -1304,10 +1319,35 @@ func (l *Lexer) processColon() *Token {
 		}
 	}
 
-	l.unread()
+	if l.read() == '{' {
+		return &Token{
+			Kind:  TYPE_INIT,
+			Value: "::{",
+			Metadata: TokenMetadata{
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
+			},
+		}
+	}
+
+	if l.read() == '(' {
+		return &Token{
+			Kind:  TYPE_CONSTRUCT,
+			Value: "::(",
+			Metadata: TokenMetadata{
+				FileName: l.fileName,
+				Line:     l.line,
+				Length:   l.col - columnStart + 1,
+				Column:   columnStart,
+			},
+		}
+	}
+
 	return &Token{
-		Kind:  COLON,
-		Value: ":",
+		Kind:  COLONCOLON,
+		Value: "::",
 		Metadata: TokenMetadata{
 			FileName: l.fileName,
 			Line:     l.line,

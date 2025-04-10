@@ -67,17 +67,19 @@ const (
 	RBRACKET // ]
 	RBRACE   // }
 
-	COLON      // :
-	COLONCOLON // ::
-	SEMICOLON  // ;
-	DOT        // .
-	COMMA      // ,
-	RANGE      // ..
-	ELLIPSIS   // ...
-	CAST       // >-
-	XMARK      // !
-	QMARK      // ?
-	TILDE      // ~
+	COLON          // :
+	COLONCOLON     // ::
+	TYPE_INIT      // ::{
+	TYPE_CONSTRUCT // ::(
+	SEMICOLON      // ;
+	DOT            // .
+	COMMA          // ,
+	RANGE          // ..
+	ELLIPSIS       // ...
+	CAST           // >-
+	XMARK          // !
+	QMARK          // ?
+	TILDE          // ~
 
 	PACKAGE
 	EXPORT
@@ -201,6 +203,10 @@ func (tk TokenKind) String() string {
 		return "COLON"
 	case COLONCOLON:
 		return "COLONCOLON"
+	case TYPE_INIT:
+		return "TYPE_INIT"
+	case TYPE_CONSTRUCT:
+		return "TYPE_CONSTRUCT"
 	case SEMICOLON:
 		return "SEMICOLON"
 	case DOT:
