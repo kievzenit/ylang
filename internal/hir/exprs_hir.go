@@ -53,7 +53,8 @@ type AssignExprHir struct {
 }
 
 type TypeMemberInstantiation struct {
-	MemberName string
+	MemberPosition int
+	MemberName     string
 	ExprHir
 }
 

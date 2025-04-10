@@ -1264,8 +1264,9 @@ func (sa *SemanticAnalyzer) analyzeTypeInstantiationExpr(typeInstantiationExpr *
 		}
 
 		instantiations = append(instantiations, hir.TypeMemberInstantiation{
-			MemberName: instantiation.Name,
-			ExprHir: instantiationExpr,
+			MemberPosition: userType.MemberPositions[instantiation.Name],
+			MemberName:     instantiation.Name,
+			ExprHir:        instantiationExpr,
 		})
 		membersSet[instantiation.Name] = struct{}{}
 	}
