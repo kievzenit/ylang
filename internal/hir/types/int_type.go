@@ -14,6 +14,10 @@ func (i *IntType) Type() string {
 	return fmt.Sprintf("u%d", i.Bits)
 }
 
+func (IntType) GetMember(name string) (Type, bool) {
+	return nil, false
+}
+
 func (i *IntType) CanBeImplicitlyCastedTo(t Type) bool {
 	intType, ok := t.(*IntType)
 	if !ok {

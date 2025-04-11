@@ -18,6 +18,10 @@ func (f *FunctionType) Type() string {
 	return fmt.Sprintf("fun(%s)", f.Name)
 }
 
+func (FunctionType) GetMember(name string) (Type, bool) {
+	return nil, false
+}
+
 func (FunctionType) CanBeImplicitlyCastedTo(t Type) bool {
 	return false
 }

@@ -6,6 +6,10 @@ func (VoidType) Type() string {
 	return "void"
 }
 
+func (VoidType) GetMember(name string) (Type, bool) {
+	return nil, false
+}
+
 func (VoidType) CanBeImplicitlyCastedTo(t Type) bool {
 	return false
 }

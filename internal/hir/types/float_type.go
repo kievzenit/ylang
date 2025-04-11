@@ -10,6 +10,10 @@ func (f *FloatType) Type() string {
 	return fmt.Sprintf("f%d", f.Bits)
 }
 
+func (f *FloatType) GetMember(name string) (Type, bool) {
+	return nil, false
+}
+
 func (f *FloatType) CanBeImplicitlyCastedTo(t Type) bool {
 	floatType, ok := t.(*FloatType)
 	if !ok {
