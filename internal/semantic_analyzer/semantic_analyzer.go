@@ -984,6 +984,8 @@ func (sa *SemanticAnalyzer) analyzeExpr(expr ast.Expr) hir.ExprHir {
 		return sa.analyzeAssignExpr(expr.(*ast.AssignExpr))
 	case *ast.TypeInstantiationExpr:
 		return sa.analyzeTypeInstantiationExpr(expr.(*ast.TypeInstantiationExpr))
+	case *ast.MemberAccessExpr:
+		return sa.analyzeMemberAccessExpr(expr.(*ast.MemberAccessExpr))
 	case *ast.CallExpr:
 		return sa.analyzeCallExpr(expr.(*ast.CallExpr))
 	case *ast.IdentExpr:
@@ -1294,6 +1296,43 @@ func (sa *SemanticAnalyzer) analyzeTypeInstantiationExpr(typeInstantiationExpr *
 		Type:           userType,
 		TypeName:       typeInstantiationExpr.TypeName,
 		Instantiations: instantiations,
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeMemberAccessExpr(memberAccessExpr *ast.MemberAccessExpr) *hir.MemberAccessExprHir {
+	left := sa.analyzeExpr(memberAccessExpr.Left)
+	if hir.IsNilExpr(left) {
+		return nil
+	}
+
+	switch memberAccessExpr.Right.(type) {
+	case *ast.IdentExpr:
+		right := memberAccessExpr.Right.(*ast.IdentExpr)
+		memberType, ok := left.ExprType().GetMember(right.Value)
+		if !ok {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("member %s not found in type %s", right.Value, left.ExprType().Type()),
+					memberAccessExpr.StartToken.Metadata.FileName,
+					memberAccessExpr.StartToken.Metadata.Line,
+					memberAccessExpr.StartToken.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.MemberAccessExprHir{
+			Type: memberType,
+			Left: left,
+			Right: &hir.IdentExprHir{
+				Type: memberType,
+				Name: right.Value,
+			},
+		}
+	case *ast.CallExpr:
+		panic("not implemented")
+	default:
+		panic("unreachable")
 	}
 }
 

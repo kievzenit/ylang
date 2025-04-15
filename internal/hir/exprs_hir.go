@@ -64,6 +64,13 @@ type TypeInstantiationExprHir struct {
 	Instantiations []TypeMemberInstantiation
 }
 
+type MemberAccessExprHir struct {
+	types.Type
+
+	Left  ExprHir
+	Right ExprHir
+}
+
 type CallExprHir struct {
 	types.Type
 	Name string
@@ -169,6 +176,7 @@ func (IdentExprHir) ExprHirNode()             {}
 func (ArgIdentExprHir) ExprHirNode()          {}
 func (AssignExprHir) ExprHirNode()            {}
 func (TypeInstantiationExprHir) ExprHirNode() {}
+func (MemberAccessExprHir) ExprHirNode()      {}
 func (CallExprHir) ExprHirNode()              {}
 func (OperatorCastExprHir) ExprHirNode()      {}
 func (DownCastExprHir) ExprHirNode()          {}
@@ -182,6 +190,7 @@ func (e IdentExprHir) ExprType() types.Type             { return e.Type }
 func (e ArgIdentExprHir) ExprType() types.Type          { return e.Type }
 func (e AssignExprHir) ExprType() types.Type            { return e.Type }
 func (e TypeInstantiationExprHir) ExprType() types.Type { return e.Type }
+func (e MemberAccessExprHir) ExprType() types.Type      { return e.Type }
 func (e CallExprHir) ExprType() types.Type              { return e.Type }
 func (e OperatorCastExprHir) ExprType() types.Type      { return e.NewType }
 func (e DownCastExprHir) ExprType() types.Type          { return e.NewType }
