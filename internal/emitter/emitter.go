@@ -89,12 +89,17 @@ func (e *Emitter) declareTypes() {
 }
 
 func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
+	if llvmType, ok := e.typesMap[userType.Name]; ok {
+		return llvmType
+	}
+
 	customStruct := e.context.StructCreateNamed(userType.Name)
-	fieldTypes := make([]llvm.Type, 0)
-	for _, member := range userType.Members {
+	fieldTypes := make([]llvm.Type, len(userType.Members))
+	for memberName, pos := range userType.MemberPositions {
+		member := userType.Members[memberName]
 		llvmType, exists := e.typesMap[member.Type()]
 		if exists {
-			fieldTypes = append(fieldTypes, llvmType)
+			fieldTypes[pos] = llvmType
 			continue
 		}
 
@@ -104,7 +109,7 @@ func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
 		}
 
 		innerStruct := e.emitForType(innerUserType)
-		fieldTypes = append(fieldTypes, innerStruct)
+		fieldTypes[pos] = innerStruct
 	}
 	customStruct.StructSetBody(fieldTypes, false)
 	e.typesMap[userType.Name] = customStruct
