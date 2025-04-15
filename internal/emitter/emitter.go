@@ -510,6 +510,8 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 		return e.emitForAssignExprHir(exprHir.(*hir.AssignExprHir))
 	case *hir.TypeInstantiationExprHir:
 		return e.emitForTypeInstantiationExprHir(exprHir.(*hir.TypeInstantiationExprHir))
+	case *hir.MemberAccessExprHir:
+		return e.emitForMemberAccessExprHir(exprHir.(*hir.MemberAccessExprHir), 0)
 	case *hir.BinaryExprHir:
 		return e.emitForBinExprHir(exprHir.(*hir.BinaryExprHir))
 	case *hir.IdentExprHir:
@@ -585,6 +587,46 @@ func (e *Emitter) emitForTypeInstantiationExprHir(typeInstantiationExprHir *hir.
 		args[instantiation.MemberPosition] = exprHir
 	}
 	return e.builder.CreateCall(initFunction.GlobalValueType(), initFunction, args, "")
+}
+
+func (e *Emitter) emitForMemberAccessExprHir(memberAccessExprHir *hir.MemberAccessExprHir, depth int) llvm.Value {
+	var leftValue llvm.Value
+	if leftIdentExprHir, ok := memberAccessExprHir.Left.(*hir.IdentExprHir); ok {
+		leftValue = e.variablesMap[leftIdentExprHir.Name]
+	} else if leftMemberExprHir, ok := memberAccessExprHir.Left.(*hir.MemberAccessExprHir); ok {
+		leftValue = e.emitForMemberAccessExprHir(leftMemberExprHir, depth+1)
+	} else {
+		leftValue = e.emitForExprHir(memberAccessExprHir.Left)
+	}
+
+	leftMemberType, ok := memberAccessExprHir.Left.ExprType().(*hir_types.UserType)
+	if !ok {
+		panic("member access should be user type")
+	}
+
+	rightIdentExprHir, ok := memberAccessExprHir.Right.(*hir.IdentExprHir)
+	if !ok {
+		panic("not implemented")
+	}
+
+	memberPosition := leftMemberType.MemberPositions[rightIdentExprHir.Name]
+	if leftValue.Type().TypeKind() == llvm.StructTypeKind {
+		return e.builder.CreateExtractValue(leftValue, memberPosition, "memberaccesstmp") 
+	}
+
+	memberGep := e.builder.CreateStructGEP(
+		e.typesMap[leftMemberType.Name],
+		leftValue,
+		memberPosition,
+		fmt.Sprintf("%s::%s", leftMemberType.Name, rightIdentExprHir.Name),
+	)
+	memberAccessExprType := e.typesMap[memberAccessExprHir.Type.Type()]
+
+	if depth == 0 {
+		return e.builder.CreateLoad(memberAccessExprType, memberGep, "memberaccesstmp")
+	}
+
+	return memberGep
 }
 
 func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
