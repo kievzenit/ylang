@@ -270,6 +270,12 @@ func (e *Emitter) emitForVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
 	e.variablesMap[varDeclStmtHir.Name] = allocValue
 	e.builder.SetInsertPointAtEnd(currBasicBlock)
 
+	if typeInstantiationExprHir, ok := varDeclStmtHir.Value.(*hir.TypeInstantiationExprHir); ok {
+		varValue := e.emitForTypeInstantiationExprHir(typeInstantiationExprHir, allocValue)
+		e.builder.CreateStore(varValue, allocValue)
+		return
+	}
+
 	varValue := e.emitForExprHir(varDeclStmtHir.Value)
 	e.builder.CreateStore(varValue, allocValue)
 }
@@ -472,13 +478,13 @@ func (e *Emitter) emitForForStmtHir(forStmtHir *hir.ForStmtHir) {
 func (e *Emitter) emitForReturnStmtHir(returnStmtHir *hir.ReturnStmtHir) {
 	e.controlFlowHappen = true
 
-	if returnStmtHir.Expr != nil {
-		value := e.emitForExprHir(returnStmtHir.Expr)
-		e.builder.CreateRet(value)
+	if returnStmtHir.Expr == nil {
+		e.builder.CreateRetVoid()
 		return
 	}
 
-	e.builder.CreateRetVoid()
+	value := e.emitForExprHir(returnStmtHir.Expr)
+	e.builder.CreateRet(value)
 }
 
 func (e *Emitter) emitForContinueStmtHir(_ *hir.ContinueStmtHir) {
@@ -509,7 +515,7 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 	case *hir.AssignExprHir:
 		return e.emitForAssignExprHir(exprHir.(*hir.AssignExprHir))
 	case *hir.TypeInstantiationExprHir:
-		return e.emitForTypeInstantiationExprHir(exprHir.(*hir.TypeInstantiationExprHir))
+		return e.emitForTypeInstantiationExprHir(exprHir.(*hir.TypeInstantiationExprHir), llvm.Value{})
 	case *hir.MemberAccessExprHir:
 		return e.emitForMemberAccessExprHir(exprHir.(*hir.MemberAccessExprHir), 0)
 	case *hir.BinaryExprHir:
@@ -578,15 +584,40 @@ func (e *Emitter) emitForAssignExprHir(assignExprHir *hir.AssignExprHir) llvm.Va
 	return value
 }
 
-func (e *Emitter) emitForTypeInstantiationExprHir(typeInstantiationExprHir *hir.TypeInstantiationExprHir) llvm.Value {
+func (e *Emitter) emitForTypeInstantiationExprHir(typeInstantiationExprHir *hir.TypeInstantiationExprHir, ptrToStruct llvm.Value) llvm.Value {
+	if ptrToStruct.IsNil() {
+		currentBasicBlock := e.builder.GetInsertBlock()
+		e.builder.SetInsertPointAtEnd(e.currentAllocBasicBlock)
+		ptrToStruct = e.builder.CreateAlloca(
+			e.typesMap[typeInstantiationExprHir.TypeName],
+			typeInstantiationExprHir.TypeName,
+		)
+		e.builder.SetInsertPointAtEnd(currentBasicBlock)
+	}
+
 	initFunction := e.initFunctionsMap[typeInstantiationExprHir.TypeName]
 
 	args := make([]llvm.Value, len(typeInstantiationExprHir.Instantiations))
 	for _, instantiation := range typeInstantiationExprHir.Instantiations {
+		if innerTypeInstantiationExprHir, ok := instantiation.ExprHir.(*hir.TypeInstantiationExprHir); ok {
+			memberGep := e.builder.CreateStructGEP(
+				e.typesMap[typeInstantiationExprHir.TypeName],
+				ptrToStruct,
+				instantiation.MemberPosition,
+				fmt.Sprintf("%s::%s", typeInstantiationExprHir.TypeName, instantiation.MemberName),
+			)
+			memberValue := e.emitForTypeInstantiationExprHir(innerTypeInstantiationExprHir, memberGep)
+
+			args[instantiation.MemberPosition] = memberValue
+
+			continue
+		}
+
 		exprHir := e.emitForExprHir(instantiation.ExprHir)
 		args[instantiation.MemberPosition] = exprHir
 	}
-	return e.builder.CreateCall(initFunction.GlobalValueType(), initFunction, args, "")
+
+	return e.builder.CreateCall(initFunction.GlobalValueType(), initFunction, args, "initcalltmp")
 }
 
 func (e *Emitter) emitForMemberAccessExprHir(memberAccessExprHir *hir.MemberAccessExprHir, depth int) llvm.Value {
@@ -611,7 +642,7 @@ func (e *Emitter) emitForMemberAccessExprHir(memberAccessExprHir *hir.MemberAcce
 
 	memberPosition := leftMemberType.MemberPositions[rightIdentExprHir.Name]
 	if leftValue.Type().TypeKind() == llvm.StructTypeKind {
-		return e.builder.CreateExtractValue(leftValue, memberPosition, "memberaccesstmp") 
+		return e.builder.CreateExtractValue(leftValue, memberPosition, "memberaccesstmp")
 	}
 
 	memberGep := e.builder.CreateStructGEP(
