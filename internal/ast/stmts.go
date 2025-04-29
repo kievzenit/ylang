@@ -1,6 +1,8 @@
 package ast
 
-import "github.com/kievzenit/ylang/internal/lexer"
+import (
+	"github.com/kievzenit/ylang/internal/lexer"
+)
 
 type ScopeStmt struct {
 	StartToken *lexer.Token
@@ -19,7 +21,7 @@ type TypeMember struct {
 	StartToken *lexer.Token
 
 	Name           string
-	Type           string
+	Type           TypeNode
 	AccessModifier *lexer.Token
 }
 
@@ -54,7 +56,7 @@ type FuncDeclStmt struct {
 	StartToken *lexer.Token
 
 	Name       string
-	ReturnType string
+	ReturnType TypeNode
 	Args       []FuncArg
 	Body       *ScopeStmt
 	Extern     bool
@@ -62,14 +64,14 @@ type FuncDeclStmt struct {
 
 type FuncArg struct {
 	Name string
-	Type string
+	Type TypeNode
 }
 
 type VarDeclStmt struct {
 	StartToken *lexer.Token
 
 	Name         string
-	ExplicitType string
+	ExplicitType TypeNode
 	Value        Expr
 	Static       bool
 	Const        bool

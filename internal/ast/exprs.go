@@ -91,14 +91,14 @@ type TypeMemberInstantiation struct {
 type TypeInstantiationExpr struct {
 	StartToken *lexer.Token
 
-	TypeName       string
+	TypeName       TypeNode
 	Instantiations []TypeMemberInstantiation
 }
 
 type TypeConstructionExpr struct {
 	StartToken *lexer.Token
 
-	TypeName string
+	TypeName TypeNode
 	Args     []Expr
 }
 
@@ -121,7 +121,7 @@ type CastExpr struct {
 
 	Left       Expr
 	NewIdent   *IdentExpr
-	CastToType string
+	CastToType TypeNode
 }
 
 type PrefixExpr struct {
