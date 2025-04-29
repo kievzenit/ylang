@@ -313,9 +313,7 @@ func (p *Parser) parseTypeMembers(typeDeclStmt *ast.TypeDeclStmt) {
 				p.expect(lexer.COLON)
 				p.read()
 
-				p.expect(lexer.IDENT)
-				argType := p.curr.Value
-				p.read()
+				argType := p.parseTypeIdentifier()
 
 				args = append(args, ast.FuncArg{
 					Name: argName,
@@ -776,7 +774,7 @@ func (p *Parser) parseVarDeclStmt(
 	startToken *lexer.Token,
 	expectSemicolon bool,
 ) *ast.VarDeclStmt {
-	var explicitType string
+	var explicitType ast.TypeNode
 
 	p.expectAny(lexer.LET, lexer.CONST)
 	if startToken == nil {
@@ -828,44 +826,64 @@ func (p *Parser) parseExprStmt(expectSemicolon bool) ast.Stmt {
 	}
 }
 
-func (p *Parser) parseBaseTypeIdentifier() string {
+func (p *Parser) parseBaseTypeIdentifier() *ast.IdentTypeNode {
 	var typeName string
 
 	p.expect(lexer.IDENT)
 	typeName = p.curr.Value
 	p.read()
 
-	for p.scanner.HasTokens() && p.curr.Kind == lexer.COLONCOLON {
-		typeName += p.curr.Value
-		p.read()
+	// TODO: add support for package name specified in type name
+	// for p.scanner.HasTokens() && p.curr.Kind == lexer.COLONCOLON {
+	// 	typeName += p.curr.Value
+	// 	p.read()
 
-		p.expect(lexer.IDENT)
-		typeName += p.curr.Value
-		p.read()
+	// 	p.expect(lexer.IDENT)
+	// 	typeName += p.curr.Value
+	// 	p.read()
+	// }
+
+	return &ast.IdentTypeNode{
+		Name: typeName,
 	}
-
-	return typeName
 }
 
-func (p *Parser) parseTypeIdentifier() string {
-	var typeName string
-	for p.scanner.HasTokens() && p.curr.Kind == lexer.LBRACKET {
-		typeName += p.curr.Value
+func (p *Parser) parseTypeIdentifier() ast.TypeNode {
+	p.expectAny(lexer.IDENT, lexer.LBRACKET, lexer.ASTERISK)
+
+	switch p.curr.Kind {
+	case lexer.IDENT:
+		return p.parseBaseTypeIdentifier()
+	case lexer.LBRACKET:
 		p.read()
 
-		if p.curr.Kind == lexer.INT {
-			typeName += p.curr.Value
+		if p.curr.Kind == lexer.RBRACKET {
 			p.read()
+			return &ast.SliceTypeNode{
+				InnerType: p.parseTypeIdentifier(),
+			}
 		}
 
-		p.expect(lexer.RBRACKET)
-		typeName += p.curr.Value
+		p.expect(lexer.INT)
+		size, _ := strconv.Atoi(p.curr.Value)
 		p.read()
+
+		p.expect(lexer.RBRACKET)
+		p.read()
+
+		return &ast.ArrayTypeNode{
+			Size:      size,
+			InnerType: p.parseTypeIdentifier(),
+		}
+	case lexer.ASTERISK:
+		p.read()
+
+		return &ast.PointerTypeNode{
+			InnerType: p.parseTypeIdentifier(),
+		}
+	default:
+		panic("unreachable")
 	}
-
-	typeName += p.parseBaseTypeIdentifier()
-
-	return typeName
 }
 
 func (p *Parser) parseExpr() ast.Expr {
@@ -1095,7 +1113,7 @@ func (p *Parser) parseTypeExpr() ast.Expr {
 }
 
 func (p *Parser) parseTypeInstantiationExpr(
-	typeName string,
+	typeName ast.TypeNode,
 	startToken *lexer.Token,
 ) *ast.TypeInstantiationExpr {
 	p.expect(lexer.TYPE_INIT)
@@ -1134,7 +1152,7 @@ func (p *Parser) parseTypeInstantiationExpr(
 }
 
 func (p *Parser) parseTypeConstructionExpr(
-	typeName string,
+	typeName ast.TypeNode,
 	startToken *lexer.Token,
 ) *ast.TypeConstructionExpr {
 	p.expect(lexer.TYPE_CONSTRUCT)
