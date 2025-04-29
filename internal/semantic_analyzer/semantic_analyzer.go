@@ -277,7 +277,7 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFuncDeclStmts() {
 			continue
 		}
 
-		returnType, ok := sa.getType(funcDeclStmt.ReturnType)
+		returnType, ok := sa.getType(funcDeclStmt.ReturnType.TypeName())
 		if !ok {
 			sa.eh.AddError(
 				newSemanticError(
@@ -291,7 +291,7 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFuncDeclStmts() {
 
 		args := make([]types.FunctionArgType, 0)
 		for _, arg := range funcDeclStmt.Args {
-			argType, ok := sa.getType(arg.Type)
+			argType, ok := sa.getType(arg.Type.TypeName())
 			if !ok {
 				sa.eh.AddError(
 					newSemanticError(
@@ -339,7 +339,7 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 	memberPositions := make(map[string]int)
 
 	for position, member := range typeDeclStmt.Members {
-		memberType, ok := sa.getType(member.Type)
+		memberType, ok := sa.getType(member.Type.TypeName())
 		switch {
 		case ok && memberType == sa.builtinTypesMap["void"]:
 			sa.eh.AddError(
@@ -357,7 +357,7 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 			continue
 		}
 
-		memberTypeDeclStmt, ok := sa.forwardTypeDeclarations[member.Type]
+		memberTypeDeclStmt, ok := sa.forwardTypeDeclarations[member.Type.TypeName()]
 		if !ok {
 			sa.eh.AddError(
 				newSemanticError(
@@ -370,7 +370,7 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 			continue
 		}
 
-		if _, ok := sa.currentlyProcessingTypes[member.Type]; ok {
+		if _, ok := sa.currentlyProcessingTypes[member.Type.TypeName()]; ok {
 			for typeName := range sa.currentlyProcessingTypes {
 				typeDeclStmt, _ := sa.forwardTypeDeclarations[typeName]
 				sa.eh.AddError(
@@ -916,8 +916,8 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 		return nil
 	}
 
-	if varDeclStmt.ExplicitType != "" {
-		varExplicitType, ok := sa.getType(varDeclStmt.ExplicitType)
+	if varDeclStmt.ExplicitType != nil {
+		varExplicitType, ok := sa.getType(varDeclStmt.ExplicitType.TypeName())
 		if !ok {
 			sa.eh.AddError(
 				newSemanticError(
@@ -1214,7 +1214,7 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 }
 
 func (sa *SemanticAnalyzer) analyzeTypeInstantiationExpr(typeInstantiationExpr *ast.TypeInstantiationExpr) *hir.TypeInstantiationExprHir {
-	userType, exists := sa.customTypesMap[typeInstantiationExpr.TypeName]
+	userType, exists := sa.customTypesMap[typeInstantiationExpr.TypeName.TypeName()]
 	if !exists {
 		sa.eh.AddError(
 			newSemanticError(
@@ -1294,7 +1294,7 @@ func (sa *SemanticAnalyzer) analyzeTypeInstantiationExpr(typeInstantiationExpr *
 
 	return &hir.TypeInstantiationExprHir{
 		Type:           userType,
-		TypeName:       typeInstantiationExpr.TypeName,
+		TypeName:       typeInstantiationExpr.TypeName.TypeName(),
 		Instantiations: instantiations,
 	}
 }
@@ -1451,7 +1451,19 @@ func (sa *SemanticAnalyzer) analyzeCastExpr(castExpr *ast.CastExpr) hir.ExprHir 
 		return nil
 	}
 
-	newType, ok := sa.builtinTypesMap[castExpr.CastToType]
+	if _, ok := castExpr.CastToType.(*ast.IdentTypeNode); !ok {
+		sa.eh.AddError(
+			newSemanticError(
+				"cannot cast to a complex types, like arrays, or slices, or pointers",
+				castExpr.StartToken.Metadata.FileName,
+				castExpr.StartToken.Metadata.Line,
+				castExpr.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	newType, ok := sa.builtinTypesMap[castExpr.CastToType.TypeName()]
 	if !ok {
 		sa.eh.AddError(
 			newSemanticError(
