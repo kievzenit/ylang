@@ -1219,7 +1219,7 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 
 func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.ExprHir {
 	rightExprHir := sa.analyzeExpr(prefixExpr.Right)
-	if rightExprHir == nil {
+	if hir.IsNilExpr(rightExprHir) {
 		return nil
 	}
 
@@ -1376,7 +1376,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 
 func (sa *SemanticAnalyzer) analyzePostfixExpr(postfixExpr *ast.PostfixExpr) *hir.PostfixExprHir {
 	leftExprHir := sa.analyzeExpr(postfixExpr.Left)
-	if leftExprHir == nil {
+	if hir.IsNilExpr(leftExprHir) {
 		return nil
 	}
 
