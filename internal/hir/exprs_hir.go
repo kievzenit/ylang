@@ -11,7 +11,6 @@ type ExprHir interface {
 	ExprHirNode()
 	ExprType() types.Type
 	IsConst() bool
-	AddressCouldBeTaken() bool
 }
 
 func IsNilExpr(expr ExprHir) bool {
@@ -20,6 +19,11 @@ func IsNilExpr(expr ExprHir) bool {
 	}
 
 	return reflect.ValueOf(expr).IsNil()
+}
+
+type LvalueExprHir interface {
+	ExprHir
+	LvalueExprHirNode()
 }
 
 type BoolExprHir struct {
@@ -267,21 +271,8 @@ func (DownCastExprHir) IsConst() bool          { return false }
 func (UpCastExprHir) IsConst() bool            { return false }
 func (e BinaryExprHir) IsConst() bool          { return e.Left.IsConst() && e.Right.IsConst() }
 
-func (BoolExprHir) AddressCouldBeTaken() bool              { return false }
-func (IntExprHir) AddressCouldBeTaken() bool               { return false }
-func (FloatExprHir) AddressCouldBeTaken() bool             { return false }
-func (IdentExprHir) AddressCouldBeTaken() bool             { return true }
-func (ArgIdentExprHir) AddressCouldBeTaken() bool          { return true }
-func (AssignExprHir) AddressCouldBeTaken() bool            { return false }
-func (TypeInstantiationExprHir) AddressCouldBeTaken() bool { return false }
-func (MemberAccessExprHir) AddressCouldBeTaken() bool      { return true }
-func (CallExprHir) AddressCouldBeTaken() bool              { return false }
-func (PrefixExprHir) AddressCouldBeTaken() bool            { return false }
-func (PostfixExprHir) AddressCouldBeTaken() bool           { return false }
-func (OperatorCastExprHir) AddressCouldBeTaken() bool      { return false }
-func (DownCastExprHir) AddressCouldBeTaken() bool          { return false }
-func (UpCastExprHir) AddressCouldBeTaken() bool            { return false }
-func (BinaryExprHir) AddressCouldBeTaken() bool            { return false }
+func (IdentExprHir) LvalueExprHirNode()          {}
+func (MemberAccessExprHir) LvalueExprHirNode()   {}
 
 func (OperatorCastExprHir) CastExprHirNode() {}
 func (DownCastExprHir) CastExprHirNode()     {}

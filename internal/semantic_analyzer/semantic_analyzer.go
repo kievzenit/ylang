@@ -1333,7 +1333,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 			Expr: rightExprHir,
 		}
 	case lexer.BAND:
-		if !rightExprHir.AddressCouldBeTaken() {
+		if _, ok := rightExprHir.(hir.LvalueExprHir); !ok {
 			sa.eh.AddError(
 				newSemanticError(
 					"address-of operator can only be applied to lvalues",
