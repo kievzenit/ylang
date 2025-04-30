@@ -2,6 +2,7 @@ package emitter
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/kievzenit/ylang/internal/hir"
 	hir_types "github.com/kievzenit/ylang/internal/hir/types"
@@ -514,6 +515,10 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 		return e.emitForDownCastExprHir(exprHir.(*hir.DownCastExprHir))
 	case *hir.AssignExprHir:
 		return e.emitForAssignExprHir(exprHir.(*hir.AssignExprHir))
+	case *hir.PrefixExprHir:
+		return e.emitForPrefixExprHir(exprHir.(*hir.PrefixExprHir))
+	case *hir.PostfixExprHir:
+		return e.emitForPostfixExprHir(exprHir.(*hir.PostfixExprHir))
 	case *hir.TypeInstantiationExprHir:
 		return e.emitForTypeInstantiationExprHir(exprHir.(*hir.TypeInstantiationExprHir), llvm.Value{})
 	case *hir.MemberAccessExprHir:
@@ -534,6 +539,19 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 		return e.emitForBoolExprHir(exprHir.(*hir.BoolExprHir))
 	default:
 		panic("not implemented")
+	}
+}
+
+func (e *Emitter) getPtrToLvalueExprHirValue(lvalueExprHir hir.LvalueExprHir) llvm.Value {
+	switch lvalueExprHir.(type) {
+	case *hir.IdentExprHir:
+		identExprHir := lvalueExprHir.(*hir.IdentExprHir)
+		identValue := e.variablesMap[identExprHir.Name]
+		return identValue
+	case *hir.MemberAccessExprHir:
+		panic("not implemented")
+	default:
+		panic("unreachable")
 	}
 }
 
@@ -582,6 +600,205 @@ func (e *Emitter) emitForAssignExprHir(assignExprHir *hir.AssignExprHir) llvm.Va
 	value := e.emitForExprHir(assignExprHir.Value)
 	e.builder.CreateStore(value, allocValue)
 	return value
+}
+
+func (e *Emitter) emitForPrefixExprHir(prefixExprHir *hir.PrefixExprHir) llvm.Value {
+	value := e.emitForExprHir(prefixExprHir.Expr)
+	switch prefixExprHir.Op {
+	case hir.UnaryPlus:
+		return value
+	case hir.UnaryNegate:
+		intType, ok := prefixExprHir.ExprType().(*hir_types.IntType)
+		if ok && intType.Signed {
+			return e.builder.CreateNSWSub(
+				llvm.ConstInt(e.typesMap[intType.Type()], 0, true),
+				value,
+				"unarynegatetmp",
+			)
+		}
+
+		if ok && !intType.Signed {
+			return e.builder.CreateNUWSub(
+				llvm.ConstInt(e.typesMap[intType.Type()], 0, true),
+				value,
+				"unarynegatetmp",
+			)
+		}
+
+		_, ok = prefixExprHir.ExprType().(*hir_types.FloatType)
+		if ok {
+			return e.builder.CreateFNeg(value, "unarynegatetmp")
+		}
+
+		panic("unreachable")
+	case hir.UnaryBitNot:
+		intType, _ := prefixExprHir.ExprType().(*hir_types.IntType)
+		return e.builder.CreateXor(
+			value,
+			llvm.ConstInt(e.typesMap[intType.Type()], math.MaxUint64, true),
+			"unarybitnottmp",
+		)
+	case hir.UnaryNot:
+		return e.builder.CreateXor(
+			value,
+			llvm.ConstInt(e.typesMap["bool"], 1, true),
+			"unarynottmp",
+		)
+	case hir.UnaryInc:
+		ptrValue := e.getPtrToLvalueExprHirValue(prefixExprHir.Expr.(hir.LvalueExprHir))
+
+		intType, ok := prefixExprHir.ExprType().(*hir_types.IntType)
+		if ok && intType.Signed {
+			resultValue := e.builder.CreateNSWAdd(
+				value,
+				llvm.ConstInt(e.typesMap[intType.Type()], 1, true),
+				"unaryinctmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return resultValue
+		}
+
+		if ok && !intType.Signed {
+			resultValue := e.builder.CreateNUWAdd(
+				value,
+				llvm.ConstInt(e.typesMap[intType.Type()], 1, true),
+				"unaryinctmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return resultValue
+		}
+
+		_, ok = prefixExprHir.ExprType().(*hir_types.FloatType)
+		if ok {
+			resultValue := e.builder.CreateFAdd(
+				value,
+				llvm.ConstFloat(e.typesMap[prefixExprHir.ExprType().Type()], 1),
+				"unaryinctmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return resultValue
+		}
+
+		panic("unreachable")
+	case hir.UnaryDec:
+		ptrValue := e.getPtrToLvalueExprHirValue(prefixExprHir.Expr.(hir.LvalueExprHir))
+
+		intType, ok := prefixExprHir.ExprType().(*hir_types.IntType)
+		if ok && intType.Signed {
+			resultValue := e.builder.CreateNSWSub(
+				value,
+				llvm.ConstInt(e.typesMap[intType.Type()], 1, true),
+				"unarydectmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return resultValue
+		}
+
+		if ok && !intType.Signed {
+			resultValue := e.builder.CreateNUWSub(
+				value,
+				llvm.ConstInt(e.typesMap[intType.Type()], 1, true),
+				"unarydectmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return resultValue
+		}
+
+		_, ok = prefixExprHir.ExprType().(*hir_types.FloatType)
+		if ok {
+			resultValue := e.builder.CreateFSub(
+				value,
+				llvm.ConstFloat(e.typesMap[prefixExprHir.ExprType().Type()], 1),
+				"unarydectmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return resultValue
+		}
+
+		panic("unreachable")
+	default:
+		panic("unreachable")
+	}
+}
+
+func (e *Emitter) emitForPostfixExprHir(postfixExprHir *hir.PostfixExprHir) llvm.Value {
+	value := e.emitForExprHir(postfixExprHir.Expr)
+	switch postfixExprHir.Op {
+	case hir.UnaryInc:
+		ptrValue := e.getPtrToLvalueExprHirValue(postfixExprHir.Expr.(hir.LvalueExprHir))
+
+		intType, ok := postfixExprHir.ExprType().(*hir_types.IntType)
+		if ok && intType.Signed {
+			resultValue := e.builder.CreateNSWAdd(
+				value,
+				llvm.ConstInt(e.typesMap[intType.Type()], 1, true),
+				"unaryinctmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return value
+		}
+
+		if ok && !intType.Signed {
+			resultValue := e.builder.CreateNUWAdd(
+				value,
+				llvm.ConstInt(e.typesMap[intType.Type()], 1, true),
+				"unaryinctmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return value
+		}
+
+		_, ok = postfixExprHir.ExprType().(*hir_types.FloatType)
+		if ok {
+			resultValue := e.builder.CreateFAdd(
+				value,
+				llvm.ConstFloat(e.typesMap[postfixExprHir.ExprType().Type()], 1),
+				"unaryinctmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return value
+		}
+
+		panic("unreachable")
+	case hir.UnaryDec:
+		ptrValue := e.getPtrToLvalueExprHirValue(postfixExprHir.Expr.(hir.LvalueExprHir))
+
+		intType, ok := postfixExprHir.ExprType().(*hir_types.IntType)
+		if ok && intType.Signed {
+			resultValue := e.builder.CreateNSWSub(
+				value,
+				llvm.ConstInt(e.typesMap[intType.Type()], 1, true),
+				"unarydectmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return value
+		}
+
+		if ok && !intType.Signed {
+			resultValue := e.builder.CreateNUWSub(
+				value,
+				llvm.ConstInt(e.typesMap[intType.Type()], 1, true),
+				"unarydectmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return value
+		}
+
+		_, ok = postfixExprHir.ExprType().(*hir_types.FloatType)
+		if ok {
+			resultValue := e.builder.CreateFSub(
+				value,
+				llvm.ConstFloat(e.typesMap[postfixExprHir.ExprType().Type()], 1),
+				"unarydectmp",
+			)
+			e.builder.CreateStore(resultValue, ptrValue)
+			return value
+		}
+
+		panic("unreachable")
+	default:
+		panic("unreachable")
+	}
 }
 
 func (e *Emitter) emitForTypeInstantiationExprHir(typeInstantiationExprHir *hir.TypeInstantiationExprHir, ptrToStruct llvm.Value) llvm.Value {
