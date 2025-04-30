@@ -982,6 +982,10 @@ func (sa *SemanticAnalyzer) analyzeExpr(expr ast.Expr) hir.ExprHir {
 		return sa.analyzeBinaryExpr(expr.(*ast.BinaryExpr))
 	case *ast.AssignExpr:
 		return sa.analyzeAssignExpr(expr.(*ast.AssignExpr))
+	case *ast.PrefixExpr:
+		return sa.analyzePrefixExpr(expr.(*ast.PrefixExpr))
+	case *ast.PostfixExpr:
+		return sa.analyzePostfixExpr(expr.(*ast.PostfixExpr))
 	case *ast.TypeInstantiationExpr:
 		return sa.analyzeTypeInstantiationExpr(expr.(*ast.TypeInstantiationExpr))
 	case *ast.MemberAccessExpr:
@@ -1210,6 +1214,214 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 			Type: varDef.Type,
 			Name: assignExpr.Ident.Value,
 		},
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.ExprHir {
+	rightExprHir := sa.analyzeExpr(prefixExpr.Right)
+	if rightExprHir == nil {
+		return nil
+	}
+
+	_, isInt := rightExprHir.ExprType().(*types.IntType)
+	_, isFloat := rightExprHir.ExprType().(*types.FloatType)
+
+	switch prefixExpr.Op.Kind {
+	case lexer.PLUS:
+		if !isInt && !isFloat {
+			sa.eh.AddError(
+				newSemanticError(
+					"unary plus operator can only be applied to numeric types",
+					prefixExpr.Op.Metadata.FileName,
+					prefixExpr.Op.Metadata.Line,
+					prefixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return rightExprHir
+	case lexer.MINUS:
+		if !isInt && !isFloat {
+			sa.eh.AddError(
+				newSemanticError(
+					"unary minus operator can only be applied to numeric types",
+					prefixExpr.Op.Metadata.FileName,
+					prefixExpr.Op.Metadata.Line,
+					prefixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.PrefixExprHir{
+			Type: rightExprHir.ExprType(),
+			Op:   hir.Negate,
+			Expr: rightExprHir,
+		}
+	case lexer.INC:
+		if !isInt && !isFloat {
+			sa.eh.AddError(
+				newSemanticError(
+					"increment operator can only be applied to numeric types",
+					prefixExpr.Op.Metadata.FileName,
+					prefixExpr.Op.Metadata.Line,
+					prefixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.PrefixExprHir{
+			Type: rightExprHir.ExprType(),
+			Op:   hir.Inc,
+			Expr: rightExprHir,
+		}
+	case lexer.DEC:
+		if !isInt && !isFloat {
+			sa.eh.AddError(
+				newSemanticError(
+					"decrement operator can only be applied to numeric types",
+					prefixExpr.Op.Metadata.FileName,
+					prefixExpr.Op.Metadata.Line,
+					prefixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.PrefixExprHir{
+			Type: rightExprHir.ExprType(),
+			Op:   hir.Dec,
+			Expr: rightExprHir,
+		}
+	case lexer.TILDE:
+		if !isInt {
+			sa.eh.AddError(
+				newSemanticError(
+					"bitwise NOT operator can only be applied to integer types",
+					prefixExpr.Op.Metadata.FileName,
+					prefixExpr.Op.Metadata.Line,
+					prefixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.PrefixExprHir{
+			Type: rightExprHir.ExprType(),
+			Op:   hir.BitNot,
+			Expr: rightExprHir,
+		}
+	case lexer.XMARK:
+		rightExprHir = sa.tryImplicitCast(rightExprHir, sa.builtinTypesMap["bool"])
+		if rightExprHir.ExprType() != sa.builtinTypesMap["bool"] {
+			sa.eh.AddError(
+				newSemanticError(
+					"unary NOT operator can only be applied to boolean types",
+					prefixExpr.Op.Metadata.FileName,
+					prefixExpr.Op.Metadata.Line,
+					prefixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.PrefixExprHir{
+			Type: rightExprHir.ExprType(),
+			Op:   hir.Not,
+			Expr: rightExprHir,
+		}
+	case lexer.BAND:
+		if !rightExprHir.AddressCouldBeTaken() {
+			sa.eh.AddError(
+				newSemanticError(
+					"address-of operator can only be applied to lvalues",
+					prefixExpr.Op.Metadata.FileName,
+					prefixExpr.Op.Metadata.Line,
+					prefixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.PrefixExprHir{
+			Type: &types.PointerType{InnerType: rightExprHir.ExprType()},
+			Op:   hir.AddressOf,
+			Expr: rightExprHir,
+		}
+	case lexer.ASTERISK:
+		pointerType, ok := rightExprHir.ExprType().(*types.PointerType)
+		if !ok {
+			sa.eh.AddError(
+				newSemanticError(
+					"dereference operator can only be applied to pointer types",
+					prefixExpr.Op.Metadata.FileName,
+					prefixExpr.Op.Metadata.Line,
+					prefixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.PrefixExprHir{
+			Type: pointerType.InnerType,
+			Op:   hir.Dereference,
+			Expr: rightExprHir,
+		}
+	default:
+		panic("unsupported prefix operator")
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzePostfixExpr(postfixExpr *ast.PostfixExpr) *hir.PostfixExprHir {
+	leftExprHir := sa.analyzeExpr(postfixExpr.Left)
+	if leftExprHir == nil {
+		return nil
+	}
+
+	_, isInt := leftExprHir.ExprType().(*types.IntType)
+	_, isFloat := leftExprHir.ExprType().(*types.FloatType)
+
+	switch postfixExpr.Op.Kind {
+	case lexer.INC:
+		if !isInt && !isFloat {
+			sa.eh.AddError(
+				newSemanticError(
+					"increment operator can only be applied to numeric types",
+					postfixExpr.Op.Metadata.FileName,
+					postfixExpr.Op.Metadata.Line,
+					postfixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.PostfixExprHir{
+			Type: leftExprHir.ExprType(),
+			Op:   hir.Inc,
+			Expr: leftExprHir,
+		}
+	case lexer.DEC:
+		if !isInt && !isFloat {
+			sa.eh.AddError(
+				newSemanticError(
+					"decrement operator can only be applied to numeric types",
+					postfixExpr.Op.Metadata.FileName,
+					postfixExpr.Op.Metadata.Line,
+					postfixExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
+
+		return &hir.PostfixExprHir{
+			Type: leftExprHir.ExprType(),
+			Op:   hir.Dec,
+			Expr: leftExprHir,
+		}
+	default:
+		panic("unsupported postfix operator")
 	}
 }
 

@@ -10,6 +10,8 @@ import (
 type ExprHir interface {
 	ExprHirNode()
 	ExprType() types.Type
+	IsConst() bool
+	AddressCouldBeTaken() bool
 }
 
 func IsNilExpr(expr ExprHir) bool {
@@ -75,6 +77,54 @@ type CallExprHir struct {
 	types.Type
 	Name string
 	Args []ExprHir
+}
+
+type UnaryOp int
+
+const (
+	Plus UnaryOp = iota
+	Negate
+	Not
+	BitNot
+	Inc
+	Dec
+	AddressOf
+	Dereference
+)
+
+func UnaryOpFromTokenKind(kind lexer.TokenKind) UnaryOp {
+	switch kind {
+	case lexer.PLUS:
+		return Plus
+	case lexer.MINUS:
+		return Negate
+	case lexer.BAND:
+		return AddressOf
+	case lexer.ASTERISK:
+		return Dereference
+	case lexer.TILDE:
+		return BitNot
+	case lexer.XMARK:
+		return Not
+	case lexer.INC:
+		return Inc
+	case lexer.DEC:
+		return Dec
+	default:
+		panic("unexpected token kind")
+	}
+}
+
+type PrefixExprHir struct {
+	types.Type
+	Op   UnaryOp
+	Expr ExprHir
+}
+
+type PostfixExprHir struct {
+	types.Type
+	Op   UnaryOp
+	Expr ExprHir
 }
 
 type CastExprHir interface {
@@ -178,6 +228,8 @@ func (AssignExprHir) ExprHirNode()            {}
 func (TypeInstantiationExprHir) ExprHirNode() {}
 func (MemberAccessExprHir) ExprHirNode()      {}
 func (CallExprHir) ExprHirNode()              {}
+func (PrefixExprHir) ExprHirNode()            {}
+func (PostfixExprHir) ExprHirNode()           {}
 func (OperatorCastExprHir) ExprHirNode()      {}
 func (DownCastExprHir) ExprHirNode()          {}
 func (UpCastExprHir) ExprHirNode()            {}
@@ -192,10 +244,44 @@ func (e AssignExprHir) ExprType() types.Type            { return e.Type }
 func (e TypeInstantiationExprHir) ExprType() types.Type { return e.Type }
 func (e MemberAccessExprHir) ExprType() types.Type      { return e.Type }
 func (e CallExprHir) ExprType() types.Type              { return e.Type }
+func (e PrefixExprHir) ExprType() types.Type            { return e.Type }
+func (e PostfixExprHir) ExprType() types.Type           { return e.Type }
 func (e OperatorCastExprHir) ExprType() types.Type      { return e.NewType }
 func (e DownCastExprHir) ExprType() types.Type          { return e.NewType }
 func (e UpCastExprHir) ExprType() types.Type            { return e.NewType }
 func (e BinaryExprHir) ExprType() types.Type            { return e.Type }
+
+func (BoolExprHir) IsConst() bool              { return true }
+func (IntExprHir) IsConst() bool               { return true }
+func (FloatExprHir) IsConst() bool             { return true }
+func (IdentExprHir) IsConst() bool             { return false }
+func (ArgIdentExprHir) IsConst() bool          { return false }
+func (AssignExprHir) IsConst() bool            { return false }
+func (TypeInstantiationExprHir) IsConst() bool { return false }
+func (MemberAccessExprHir) IsConst() bool      { return false }
+func (CallExprHir) IsConst() bool              { return false }
+func (PrefixExprHir) IsConst() bool            { return false }
+func (PostfixExprHir) IsConst() bool           { return false }
+func (OperatorCastExprHir) IsConst() bool      { return false }
+func (DownCastExprHir) IsConst() bool          { return false }
+func (UpCastExprHir) IsConst() bool            { return false }
+func (e BinaryExprHir) IsConst() bool          { return e.Left.IsConst() && e.Right.IsConst() }
+
+func (BoolExprHir) AddressCouldBeTaken() bool              { return false }
+func (IntExprHir) AddressCouldBeTaken() bool               { return false }
+func (FloatExprHir) AddressCouldBeTaken() bool             { return false }
+func (IdentExprHir) AddressCouldBeTaken() bool             { return true }
+func (ArgIdentExprHir) AddressCouldBeTaken() bool          { return true }
+func (AssignExprHir) AddressCouldBeTaken() bool            { return false }
+func (TypeInstantiationExprHir) AddressCouldBeTaken() bool { return false }
+func (MemberAccessExprHir) AddressCouldBeTaken() bool      { return true }
+func (CallExprHir) AddressCouldBeTaken() bool              { return false }
+func (PrefixExprHir) AddressCouldBeTaken() bool            { return false }
+func (PostfixExprHir) AddressCouldBeTaken() bool           { return false }
+func (OperatorCastExprHir) AddressCouldBeTaken() bool      { return false }
+func (DownCastExprHir) AddressCouldBeTaken() bool          { return false }
+func (UpCastExprHir) AddressCouldBeTaken() bool            { return false }
+func (BinaryExprHir) AddressCouldBeTaken() bool            { return false }
 
 func (OperatorCastExprHir) CastExprHirNode() {}
 func (DownCastExprHir) CastExprHirNode()     {}
