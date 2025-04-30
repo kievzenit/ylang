@@ -1139,70 +1139,70 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Add,
+			Op:    hir.BinaryAdd,
 			Right: expr,
 		}
 	case lexer.SUB_ASSIGN:
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Sub,
+			Op:    hir.BinarySub,
 			Right: expr,
 		}
 	case lexer.MUL_ASSIGN:
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Mul,
+			Op:    hir.BinaryMul,
 			Right: expr,
 		}
 	case lexer.DIV_ASSIGN:
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Div,
+			Op:    hir.BinaryDiv,
 			Right: expr,
 		}
 	case lexer.MOD_ASSIGN:
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Mod,
+			Op:    hir.BinaryMod,
 			Right: expr,
 		}
 	case lexer.BAND_ASSIGN:
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Band,
+			Op:    hir.BinaryBand,
 			Right: expr,
 		}
 	case lexer.BOR_ASSIGN:
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Bor,
+			Op:    hir.BinaryBor,
 			Right: expr,
 		}
 	case lexer.XOR_ASSIGN:
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Xor,
+			Op:    hir.BinaryXor,
 			Right: expr,
 		}
 	case lexer.SHL_ASSIGN:
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Shl,
+			Op:    hir.BinaryShl,
 			Right: expr,
 		}
 	case lexer.SHR_ASSIGN:
 		expr = &hir.BinaryExprHir{
 			Type:  varDef.Type,
 			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
-			Op:    hir.Shr,
+			Op:    hir.BinaryShr,
 			Right: expr,
 		}
 	}
@@ -1256,7 +1256,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 
 		return &hir.PrefixExprHir{
 			Type: rightExprHir.ExprType(),
-			Op:   hir.Negate,
+			Op:   hir.UnaryNegate,
 			Expr: rightExprHir,
 		}
 	case lexer.INC:
@@ -1274,7 +1274,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 
 		return &hir.PrefixExprHir{
 			Type: rightExprHir.ExprType(),
-			Op:   hir.Inc,
+			Op:   hir.UnaryInc,
 			Expr: rightExprHir,
 		}
 	case lexer.DEC:
@@ -1292,7 +1292,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 
 		return &hir.PrefixExprHir{
 			Type: rightExprHir.ExprType(),
-			Op:   hir.Dec,
+			Op:   hir.UnaryDec,
 			Expr: rightExprHir,
 		}
 	case lexer.TILDE:
@@ -1310,7 +1310,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 
 		return &hir.PrefixExprHir{
 			Type: rightExprHir.ExprType(),
-			Op:   hir.BitNot,
+			Op:   hir.UnaryBitNot,
 			Expr: rightExprHir,
 		}
 	case lexer.XMARK:
@@ -1329,7 +1329,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 
 		return &hir.PrefixExprHir{
 			Type: rightExprHir.ExprType(),
-			Op:   hir.Not,
+			Op:   hir.UnaryNot,
 			Expr: rightExprHir,
 		}
 	case lexer.BAND:
@@ -1347,7 +1347,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 
 		return &hir.PrefixExprHir{
 			Type: &types.PointerType{InnerType: rightExprHir.ExprType()},
-			Op:   hir.AddressOf,
+			Op:   hir.UnaryAddressOf,
 			Expr: rightExprHir,
 		}
 	case lexer.ASTERISK:
@@ -1366,7 +1366,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 
 		return &hir.PrefixExprHir{
 			Type: pointerType.InnerType,
-			Op:   hir.Dereference,
+			Op:   hir.UnaryDereference,
 			Expr: rightExprHir,
 		}
 	default:
@@ -1399,7 +1399,7 @@ func (sa *SemanticAnalyzer) analyzePostfixExpr(postfixExpr *ast.PostfixExpr) *hi
 
 		return &hir.PostfixExprHir{
 			Type: leftExprHir.ExprType(),
-			Op:   hir.Inc,
+			Op:   hir.UnaryInc,
 			Expr: leftExprHir,
 		}
 	case lexer.DEC:
@@ -1417,7 +1417,7 @@ func (sa *SemanticAnalyzer) analyzePostfixExpr(postfixExpr *ast.PostfixExpr) *hi
 
 		return &hir.PostfixExprHir{
 			Type: leftExprHir.ExprType(),
-			Op:   hir.Dec,
+			Op:   hir.UnaryDec,
 			Expr: leftExprHir,
 		}
 	default:

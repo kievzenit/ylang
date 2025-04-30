@@ -679,7 +679,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 	}
 
 	switch binExprHir.Op {
-	case hir.Add:
+	case hir.BinaryAdd:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -691,7 +691,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Sub:
+	case hir.BinarySub:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -703,7 +703,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Mul:
+	case hir.BinaryMul:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -715,7 +715,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Div:
+	case hir.BinaryDiv:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -729,7 +729,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Mod:
+	case hir.BinaryMod:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -743,7 +743,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Gt:
+	case hir.BinaryGt:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -757,7 +757,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Ge:
+	case hir.BinaryGe:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -771,7 +771,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Lt:
+	case hir.BinaryLt:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -785,7 +785,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Le:
+	case hir.BinaryLe:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -799,7 +799,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Eq:
+	case hir.BinaryEq:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -811,7 +811,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Ne:
+	case hir.BinaryNe:
 		leftValue := e.emitForExprHir(binExprHir.Left)
 		rightValue := e.emitForExprHir(binExprHir.Right)
 
@@ -823,7 +823,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		default:
 			panic("not implemented")
 		}
-	case hir.Land:
+	case hir.BinaryLand:
 		privNextBasicBlock := e.nextBasicBlock
 
 		checkBlock := e.context.AddBasicBlock(e.currentFunc, "andcheck")
@@ -863,7 +863,7 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 		e.nextBasicBlock = privNextBasicBlock
 
 		return phi
-	case hir.Lor:
+	case hir.BinaryLor:
 		privNextBasicBlock := e.nextBasicBlock
 
 		checkBlock := e.context.AddBasicBlock(e.currentFunc, "orcheck")

@@ -82,34 +82,34 @@ type CallExprHir struct {
 type UnaryOp int
 
 const (
-	Plus UnaryOp = iota
-	Negate
-	Not
-	BitNot
-	Inc
-	Dec
-	AddressOf
-	Dereference
+	UnaryPlus UnaryOp = iota
+	UnaryNegate
+	UnaryNot
+	UnaryBitNot
+	UnaryInc
+	UnaryDec
+	UnaryAddressOf
+	UnaryDereference
 )
 
 func UnaryOpFromTokenKind(kind lexer.TokenKind) UnaryOp {
 	switch kind {
 	case lexer.PLUS:
-		return Plus
+		return UnaryPlus
 	case lexer.MINUS:
-		return Negate
+		return UnaryNegate
 	case lexer.BAND:
-		return AddressOf
+		return UnaryAddressOf
 	case lexer.ASTERISK:
-		return Dereference
+		return UnaryDereference
 	case lexer.TILDE:
-		return BitNot
+		return UnaryBitNot
 	case lexer.XMARK:
-		return Not
+		return UnaryNot
 	case lexer.INC:
-		return Inc
+		return UnaryInc
 	case lexer.DEC:
-		return Dec
+		return UnaryDec
 	default:
 		panic("unexpected token kind")
 	}
@@ -153,60 +153,60 @@ type UpCastExprHir struct {
 type BinaryOp int
 
 const (
-	Add BinaryOp = iota
-	Sub
-	Mul
-	Div
-	Mod
-	Band
-	Bor
-	Xor
-	Shl
-	Shr
-	Eq
-	Ne
-	Lt
-	Gt
-	Le
-	Ge
-	Land
-	Lor
+	BinaryAdd BinaryOp = iota
+	BinarySub
+	BinaryMul
+	BinaryDiv
+	BinaryMod
+	BinaryBand
+	BinaryBor
+	BinaryXor
+	BinaryShl
+	BinaryShr
+	BinaryEq
+	BinaryNe
+	BinaryLt
+	BinaryGt
+	BinaryLe
+	BinaryGe
+	BinaryLand
+	BinaryLor
 )
 
 func BinOpFromTokenKind(kind lexer.TokenKind) BinaryOp {
 	switch kind {
 	case lexer.PLUS:
-		return Add
+		return BinaryAdd
 	case lexer.MINUS:
-		return Sub
+		return BinarySub
 	case lexer.ASTERISK:
-		return Mul
+		return BinaryMul
 	case lexer.SLASH:
-		return Div
+		return BinaryDiv
 	case lexer.PERCENT:
-		return Mod
+		return BinaryMod
 	case lexer.BAND:
-		return Band
+		return BinaryBand
 	case lexer.BOR:
-		return Bor
+		return BinaryBor
 	case lexer.XOR:
-		return Xor
+		return BinaryXor
 	case lexer.LT:
-		return Lt
+		return BinaryLt
 	case lexer.GT:
-		return Gt
+		return BinaryGt
 	case lexer.LEQ:
-		return Le
+		return BinaryLe
 	case lexer.GEQ:
-		return Ge
+		return BinaryGe
 	case lexer.EQ:
-		return Eq
+		return BinaryEq
 	case lexer.NEQ:
-		return Ne
+		return BinaryNe
 	case lexer.LAND:
-		return Land
+		return BinaryLand
 	case lexer.LOR:
-		return Lor
+		return BinaryLor
 	default:
 		panic("unexpected token kind")
 	}
