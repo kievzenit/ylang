@@ -61,6 +61,18 @@ func (e *Emitter) Emit() llvm.Module {
 	return e.module
 }
 
+func (e *Emitter) getLlvmTypeForType(hirType hir_types.Type) llvm.Type {
+	if ptrType, ok := hirType.(*hir_types.PointerType); ok {
+		return llvm.PointerType(e.getLlvmTypeForType(ptrType.InnerType), 0)
+	}
+
+	if llvmType, ok := e.typesMap[hirType.Type()]; ok {
+		return llvmType
+	}
+
+	panic("type not found")
+}
+
 func (e *Emitter) declareTypes() {
 	e.typesMap["bool"] = e.context.Int1Type()
 
@@ -716,6 +728,13 @@ func (e *Emitter) emitForPrefixExprHir(prefixExprHir *hir.PrefixExprHir) llvm.Va
 		}
 
 		panic("unreachable")
+	case hir.UnaryAddressOf:
+		ptrValue := e.getPtrToLvalueExprHirValue(prefixExprHir.Expr.(hir.LvalueExprHir))
+		return ptrValue
+	case hir.UnaryDereference:
+		innerPtrType := e.getLlvmTypeForType(prefixExprHir.ExprType())
+		derefValue := e.builder.CreateLoad(innerPtrType, value, "dereftmp")
+		return derefValue
 	default:
 		panic("unreachable")
 	}
