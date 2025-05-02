@@ -61,6 +61,18 @@ func (e *Emitter) Emit() llvm.Module {
 	return e.module
 }
 
+func (e *Emitter) llvmTypeExistsForType(hirType hir_types.Type) bool {
+	if ptrType, ok := hirType.(*hir_types.PointerType); ok {
+		return e.llvmTypeExistsForType(ptrType.InnerType)
+	}
+
+	if _, ok := e.typesMap[hirType.Type()]; ok {
+		return true
+	}
+
+	return false
+}
+
 func (e *Emitter) getLlvmTypeForType(hirType hir_types.Type) llvm.Type {
 	if ptrType, ok := hirType.(*hir_types.PointerType); ok {
 		return llvm.PointerType(e.getLlvmTypeForType(ptrType.InnerType), 0)
@@ -109,14 +121,15 @@ func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
 	customStruct := e.context.StructCreateNamed(userType.Name)
 	fieldTypes := make([]llvm.Type, len(userType.Members))
 	for memberName, pos := range userType.MemberPositions {
-		member := userType.Members[memberName]
-		llvmType, exists := e.typesMap[member.Type()]
-		if exists {
+		memberType := userType.Members[memberName]
+		llvmTypeAlreadyExists := e.llvmTypeExistsForType(memberType)
+		llvmType := e.getLlvmTypeForType(memberType)
+		if llvmTypeAlreadyExists {
 			fieldTypes[pos] = llvmType
 			continue
 		}
 
-		innerUserType, ok := member.(*hir_types.UserType)
+		innerUserType, ok := memberType.(*hir_types.UserType)
 		if !ok {
 			panic("type should be either builtin or user type, this was not")
 		}
@@ -172,10 +185,10 @@ func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
 func (e *Emitter) declareFuncPrototypes() {
 	for _, funcType := range e.fileHir.FuncPrototypes {
 		funcName := funcType.Name
-		returnType := e.typesMap[funcType.ReturnType.Type()]
+		returnType := e.getLlvmTypeForType(funcType.ReturnType)
 		argsTypes := make([]llvm.Type, 0)
 		for _, arg := range funcType.Args {
-			argsTypes = append(argsTypes, e.typesMap[arg.Type.Type()])
+			argsTypes = append(argsTypes, e.getLlvmTypeForType(arg.Type))
 		}
 		funcType := llvm.FunctionType(returnType, argsTypes, false)
 		funcValue := llvm.AddFunction(e.module, funcName, funcType)
@@ -277,7 +290,7 @@ func (e *Emitter) emitForVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
 	currBasicBlock := e.builder.GetInsertBlock()
 	e.builder.SetInsertPointAtEnd(e.currentAllocBasicBlock)
 	allocValue := e.builder.CreateAlloca(
-		e.typesMap[varDeclStmtHir.Value.ExprType().Type()],
+		e.getLlvmTypeForType(varDeclStmtHir.Value.ExprType()),
 		varDeclStmtHir.Name,
 	)
 	e.variablesMap[varDeclStmtHir.Name] = allocValue
@@ -721,11 +734,11 @@ func (e *Emitter) emitForPrefixExprHir(prefixExprHir *hir.PrefixExprHir) llvm.Va
 			return resultValue
 		}
 
-		_, ok = prefixExprHir.ExprType().(*hir_types.FloatType)
+		floatType, ok := prefixExprHir.ExprType().(*hir_types.FloatType)
 		if ok {
 			resultValue := e.builder.CreateFSub(
 				value,
-				llvm.ConstFloat(e.typesMap[prefixExprHir.ExprType().Type()], 1),
+				llvm.ConstFloat(e.typesMap[floatType.Type()], 1),
 				"unarydectmp",
 			)
 			e.builder.CreateStore(resultValue, ptrValue)
@@ -773,11 +786,11 @@ func (e *Emitter) emitForPostfixExprHir(postfixExprHir *hir.PostfixExprHir) llvm
 			return value
 		}
 
-		_, ok = postfixExprHir.ExprType().(*hir_types.FloatType)
+		floatType, ok := postfixExprHir.ExprType().(*hir_types.FloatType)
 		if ok {
 			resultValue := e.builder.CreateFAdd(
 				value,
-				llvm.ConstFloat(e.typesMap[postfixExprHir.ExprType().Type()], 1),
+				llvm.ConstFloat(e.typesMap[floatType.Type()], 1),
 				"unaryinctmp",
 			)
 			e.builder.CreateStore(resultValue, ptrValue)
@@ -809,11 +822,11 @@ func (e *Emitter) emitForPostfixExprHir(postfixExprHir *hir.PostfixExprHir) llvm
 			return value
 		}
 
-		_, ok = postfixExprHir.ExprType().(*hir_types.FloatType)
+		floatType, ok := postfixExprHir.ExprType().(*hir_types.FloatType)
 		if ok {
 			resultValue := e.builder.CreateFSub(
 				value,
-				llvm.ConstFloat(e.typesMap[postfixExprHir.ExprType().Type()], 1),
+				llvm.ConstFloat(e.typesMap[floatType.Type()], 1),
 				"unarydectmp",
 			)
 			e.builder.CreateStore(resultValue, ptrValue)
@@ -888,12 +901,12 @@ func (e *Emitter) emitForMemberAccessExprHir(memberAccessExprHir *hir.MemberAcce
 	}
 
 	memberGep := e.builder.CreateStructGEP(
-		e.typesMap[leftMemberType.Name],
+		e.getLlvmTypeForType(leftMemberType),
 		leftValue,
 		memberPosition,
 		fmt.Sprintf("%s::%s", leftMemberType.Name, rightIdentExprHir.Name),
 	)
-	memberAccessExprType := e.typesMap[memberAccessExprHir.Type.Type()]
+	memberAccessExprType := e.getLlvmTypeForType(memberAccessExprHir.Type)
 
 	if depth == 0 {
 		return e.builder.CreateLoad(memberAccessExprType, memberGep, "memberaccesstmp")
@@ -1155,7 +1168,7 @@ func (e *Emitter) emitForArgIdentExprHir(argIdentExprHir *hir.ArgIdentExprHir) l
 }
 
 func (e *Emitter) emitForIdentExprHir(identExprHir *hir.IdentExprHir) llvm.Value {
-	identType := e.typesMap[identExprHir.ExprType().Type()]
+	identType := e.getLlvmTypeForType(identExprHir.ExprType())
 	identValue := e.variablesMap[identExprHir.Name]
 	return e.builder.CreateLoad(identType, identValue, "loadtmp")
 }
