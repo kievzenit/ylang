@@ -615,11 +615,12 @@ func (e *Emitter) emitForAssignExprHir(assignExprHir *hir.AssignExprHir) llvm.Va
 }
 
 func (e *Emitter) emitForPrefixExprHir(prefixExprHir *hir.PrefixExprHir) llvm.Value {
-	value := e.emitForExprHir(prefixExprHir.Expr)
 	switch prefixExprHir.Op {
 	case hir.UnaryPlus:
+		value := e.emitForExprHir(prefixExprHir.Expr)
 		return value
 	case hir.UnaryNegate:
+		value := e.emitForExprHir(prefixExprHir.Expr)
 		intType, ok := prefixExprHir.ExprType().(*hir_types.IntType)
 		if ok && intType.Signed {
 			return e.builder.CreateNSWSub(
@@ -644,6 +645,7 @@ func (e *Emitter) emitForPrefixExprHir(prefixExprHir *hir.PrefixExprHir) llvm.Va
 
 		panic("unreachable")
 	case hir.UnaryBitNot:
+		value := e.emitForExprHir(prefixExprHir.Expr)
 		intType, _ := prefixExprHir.ExprType().(*hir_types.IntType)
 		return e.builder.CreateXor(
 			value,
@@ -651,12 +653,14 @@ func (e *Emitter) emitForPrefixExprHir(prefixExprHir *hir.PrefixExprHir) llvm.Va
 			"unarybitnottmp",
 		)
 	case hir.UnaryNot:
+		value := e.emitForExprHir(prefixExprHir.Expr)
 		return e.builder.CreateXor(
 			value,
 			llvm.ConstInt(e.typesMap["bool"], 1, true),
 			"unarynottmp",
 		)
 	case hir.UnaryInc:
+		value := e.emitForExprHir(prefixExprHir.Expr)
 		ptrValue := e.getPtrToLvalueExprHirValue(prefixExprHir.Expr.(hir.LvalueExprHir))
 
 		intType, ok := prefixExprHir.ExprType().(*hir_types.IntType)
@@ -693,6 +697,7 @@ func (e *Emitter) emitForPrefixExprHir(prefixExprHir *hir.PrefixExprHir) llvm.Va
 
 		panic("unreachable")
 	case hir.UnaryDec:
+		value := e.emitForExprHir(prefixExprHir.Expr)
 		ptrValue := e.getPtrToLvalueExprHirValue(prefixExprHir.Expr.(hir.LvalueExprHir))
 
 		intType, ok := prefixExprHir.ExprType().(*hir_types.IntType)
@@ -732,6 +737,7 @@ func (e *Emitter) emitForPrefixExprHir(prefixExprHir *hir.PrefixExprHir) llvm.Va
 		ptrValue := e.getPtrToLvalueExprHirValue(prefixExprHir.Expr.(hir.LvalueExprHir))
 		return ptrValue
 	case hir.UnaryDereference:
+		value := e.emitForExprHir(prefixExprHir.Expr)
 		innerPtrType := e.getLlvmTypeForType(prefixExprHir.ExprType())
 		derefValue := e.builder.CreateLoad(innerPtrType, value, "dereftmp")
 		return derefValue
