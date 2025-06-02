@@ -105,7 +105,7 @@
 
 <unary_expression> ::= <prefix_expression> | <postfix_expression>
 
-<prefix_expression:> ::= <prefix_part>? <postfix_expression>
+<prefix_expression:> ::= <prefix_part>? <primary_expression>
 <prefix_part> ::= "++" | "--" | "-" | "+" | "!" | "~" | "&" | "*"
 
 <postfix_expression> ::= <primary_expression> <postfix_part>?
