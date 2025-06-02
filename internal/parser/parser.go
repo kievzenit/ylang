@@ -887,7 +887,7 @@ func (p *Parser) parseTypeIdentifier() ast.TypeNode {
 }
 
 func (p *Parser) parseExpr() ast.Expr {
-	left := p.parseUnaryExpr()
+	left := p.parseAssignExpr()
 	return p.parseBinaryExpr(left, 0)
 }
 
@@ -906,6 +906,7 @@ func (p *Parser) parseUnaryExpr() ast.Expr {
 		p.read()
 
 		expr := p.parsePrimaryExpr()
+
 		return &ast.PrefixExpr{
 			StartToken: op,
 
@@ -947,23 +948,6 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 		if p.isCurrAny(lexer.TYPE_INIT, lexer.TYPE_CONSTRUCT) {
 			p.unread()
 			expr = p.parseTypeExpr()
-			break
-		}
-
-		if p.isCurrAny(
-			lexer.ASSIGN,
-			lexer.ADD_ASSIGN,
-			lexer.SUB_ASSIGN,
-			lexer.MUL_ASSIGN,
-			lexer.DIV_ASSIGN,
-			lexer.MOD_ASSIGN,
-			lexer.BAND_ASSIGN,
-			lexer.BOR_ASSIGN,
-			lexer.XOR_ASSIGN,
-			lexer.SHR_ASSIGN,
-			lexer.SHL_ASSIGN) {
-			p.unread()
-			expr = p.parseAssignExpr()
 			break
 		}
 
@@ -1058,9 +1042,9 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 }
 
 func (p *Parser) parseAssignExpr() ast.Expr {
-	ident := p.parseIdentExpr()
+	unaryExpr := p.parseUnaryExpr()
 
-	p.expectAny(lexer.ASSIGN,
+	if !p.isCurrAny(lexer.ASSIGN,
 		lexer.ADD_ASSIGN,
 		lexer.SUB_ASSIGN,
 		lexer.MUL_ASSIGN,
@@ -1070,18 +1054,21 @@ func (p *Parser) parseAssignExpr() ast.Expr {
 		lexer.BOR_ASSIGN,
 		lexer.XOR_ASSIGN,
 		lexer.SHR_ASSIGN,
-		lexer.SHL_ASSIGN)
+		lexer.SHL_ASSIGN) {
+		return unaryExpr
+	}
+
 	op := p.curr
 	p.read()
 
 	value := p.parseExpr()
 
 	return &ast.AssignExpr{
-		StartToken: ident.FirstToken(),
+		StartToken: unaryExpr.FirstToken(),
 
-		Ident: ident,
+		Left:  unaryExpr,
 		Op:    op,
-		Value: value,
+		Right: value,
 	}
 }
 
@@ -1186,7 +1173,7 @@ func (p *Parser) parseBinaryExpr(left ast.Expr, bindingPower int) ast.Expr {
 		}
 		p.read()
 
-		right := p.parseUnaryExpr()
+		right := p.parseAssignExpr()
 
 		nextBindingPower, ok := bindingPowerLookup[p.curr.Kind]
 		if !ok || currentBindingPower < nextBindingPower {

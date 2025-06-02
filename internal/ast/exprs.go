@@ -71,9 +71,9 @@ type IdentExpr struct {
 type AssignExpr struct {
 	StartToken *lexer.Token
 
-	Ident *IdentExpr
+	Left  Expr
 	Op    *lexer.Token
-	Value Expr
+	Right Expr
 }
 
 type CallExpr struct {
