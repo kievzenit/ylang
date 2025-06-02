@@ -38,6 +38,12 @@ type Expr interface {
 	ExprNode()
 }
 
+type UnaryExpr interface {
+	Expr
+	GetOp() *lexer.Token
+	UnaryExprNode()
+}
+
 func (p *PackageStmt) AstNode() {}
 func (p *PackageStmt) FirstToken() *lexer.Token {
 	return p.StartToken

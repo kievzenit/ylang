@@ -196,3 +196,9 @@ func (CastExpr) ExprNode()              {}
 func (PrefixExpr) ExprNode()            {}
 func (PostfixExpr) ExprNode()           {}
 func (BinaryExpr) ExprNode()            {}
+
+func (PrefixExpr) UnaryExprNode()  {}
+func (PostfixExpr) UnaryExprNode() {}
+
+func (e *PrefixExpr) GetOp() *lexer.Token { return e.Op }
+func (e *PostfixExpr) GetOp() *lexer.Token { return e.Op }
