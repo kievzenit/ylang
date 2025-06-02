@@ -146,53 +146,53 @@ type BinaryExpr struct {
 	Right Expr
 }
 
-func (b *BoolExpr) AstNode()              {}
-func (i *IntExpr) AstNode()               {}
-func (f *FloatExpr) AstNode()             {}
-func (c *CharExpr) AstNode()              {}
-func (s *StringExpr) AstNode()            {}
-func (i *IdentExpr) AstNode()             {}
-func (a *AssignExpr) AstNode()            {}
-func (c *CallExpr) AstNode()              {}
-func (a *TypeInstantiationExpr) AstNode() {}
-func (a *TypeConstructionExpr) AstNode()  {}
-func (a *ArraySubscriptExpr) AstNode()    {}
-func (m *MemberAccessExpr) AstNode()      {}
-func (c *CastExpr) AstNode()              {}
-func (b *PrefixExpr) AstNode()            {}
-func (b *PostfixExpr) AstNode()           {}
-func (b *BinaryExpr) AstNode()            {}
+func (BoolExpr) AstNode()              {}
+func (IntExpr) AstNode()               {}
+func (FloatExpr) AstNode()             {}
+func (CharExpr) AstNode()              {}
+func (StringExpr) AstNode()            {}
+func (IdentExpr) AstNode()             {}
+func (AssignExpr) AstNode()            {}
+func (CallExpr) AstNode()              {}
+func (TypeInstantiationExpr) AstNode() {}
+func (TypeConstructionExpr) AstNode()  {}
+func (ArraySubscriptExpr) AstNode()    {}
+func (MemberAccessExpr) AstNode()      {}
+func (CastExpr) AstNode()              {}
+func (PrefixExpr) AstNode()            {}
+func (PostfixExpr) AstNode()           {}
+func (BinaryExpr) AstNode()            {}
 
-func (b *BoolExpr) FirstToken() *lexer.Token              { return b.StartToken }
-func (i *IntExpr) FirstToken() *lexer.Token               { return i.StartToken }
-func (f *FloatExpr) FirstToken() *lexer.Token             { return f.StartToken }
-func (c *CharExpr) FirstToken() *lexer.Token              { return c.StartToken }
-func (s *StringExpr) FirstToken() *lexer.Token            { return s.StartToken }
-func (i *IdentExpr) FirstToken() *lexer.Token             { return i.StartToken }
-func (a *AssignExpr) FirstToken() *lexer.Token            { return a.StartToken }
-func (c *CallExpr) FirstToken() *lexer.Token              { return c.StartToken }
-func (a *TypeInstantiationExpr) FirstToken() *lexer.Token { return a.StartToken }
-func (a *TypeConstructionExpr) FirstToken() *lexer.Token  { return a.StartToken }
-func (a *ArraySubscriptExpr) FirstToken() *lexer.Token    { return a.StartToken }
-func (m *MemberAccessExpr) FirstToken() *lexer.Token      { return m.StartToken }
-func (c *CastExpr) FirstToken() *lexer.Token              { return c.StartToken }
-func (b *PrefixExpr) FirstToken() *lexer.Token            { return b.StartToken }
-func (b *PostfixExpr) FirstToken() *lexer.Token           { return b.StartToken }
-func (b *BinaryExpr) FirstToken() *lexer.Token            { return b.StartToken }
+func (e *BoolExpr) FirstToken() *lexer.Token              { return e.StartToken }
+func (e *IntExpr) FirstToken() *lexer.Token               { return e.StartToken }
+func (e *FloatExpr) FirstToken() *lexer.Token             { return e.StartToken }
+func (e *CharExpr) FirstToken() *lexer.Token              { return e.StartToken }
+func (e *StringExpr) FirstToken() *lexer.Token            { return e.StartToken }
+func (e *IdentExpr) FirstToken() *lexer.Token             { return e.StartToken }
+func (e *AssignExpr) FirstToken() *lexer.Token            { return e.StartToken }
+func (e *CallExpr) FirstToken() *lexer.Token              { return e.StartToken }
+func (e *TypeInstantiationExpr) FirstToken() *lexer.Token { return e.StartToken }
+func (e *TypeConstructionExpr) FirstToken() *lexer.Token  { return e.StartToken }
+func (e *ArraySubscriptExpr) FirstToken() *lexer.Token    { return e.StartToken }
+func (e *MemberAccessExpr) FirstToken() *lexer.Token      { return e.StartToken }
+func (e *CastExpr) FirstToken() *lexer.Token              { return e.StartToken }
+func (e *PrefixExpr) FirstToken() *lexer.Token            { return e.StartToken }
+func (e *PostfixExpr) FirstToken() *lexer.Token           { return e.StartToken }
+func (e *BinaryExpr) FirstToken() *lexer.Token            { return e.StartToken }
 
-func (b *BoolExpr) ExprNode()              {}
-func (i *IntExpr) ExprNode()               {}
-func (f *FloatExpr) ExprNode()             {}
-func (c *CharExpr) ExprNode()              {}
-func (s *StringExpr) ExprNode()            {}
-func (i *IdentExpr) ExprNode()             {}
-func (a *AssignExpr) ExprNode()            {}
-func (c *CallExpr) ExprNode()              {}
-func (a *TypeInstantiationExpr) ExprNode() {}
-func (a *TypeConstructionExpr) ExprNode()  {}
-func (a *ArraySubscriptExpr) ExprNode()    {}
-func (m *MemberAccessExpr) ExprNode()      {}
-func (c *CastExpr) ExprNode()              {}
-func (b *PrefixExpr) ExprNode()            {}
-func (b *PostfixExpr) ExprNode()           {}
-func (b *BinaryExpr) ExprNode()            {}
+func (BoolExpr) ExprNode()              {}
+func (IntExpr) ExprNode()               {}
+func (FloatExpr) ExprNode()             {}
+func (CharExpr) ExprNode()              {}
+func (StringExpr) ExprNode()            {}
+func (IdentExpr) ExprNode()             {}
+func (AssignExpr) ExprNode()            {}
+func (CallExpr) ExprNode()              {}
+func (TypeInstantiationExpr) ExprNode() {}
+func (TypeConstructionExpr) ExprNode()  {}
+func (ArraySubscriptExpr) ExprNode()    {}
+func (MemberAccessExpr) ExprNode()      {}
+func (CastExpr) ExprNode()              {}
+func (PrefixExpr) ExprNode()            {}
+func (PostfixExpr) ExprNode()           {}
+func (BinaryExpr) ExprNode()            {}
