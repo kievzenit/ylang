@@ -54,8 +54,8 @@ type ArgIdentExprHir struct {
 
 type AssignExprHir struct {
 	types.Type
-	Ident *IdentExprHir
-	Value ExprHir
+	Left  ExprHir
+	Right ExprHir
 }
 
 type TypeMemberInstantiation struct {
@@ -271,8 +271,8 @@ func (DownCastExprHir) IsConst() bool          { return false }
 func (UpCastExprHir) IsConst() bool            { return false }
 func (e BinaryExprHir) IsConst() bool          { return e.Left.IsConst() && e.Right.IsConst() }
 
-func (IdentExprHir) LvalueExprHirNode()          {}
-func (MemberAccessExprHir) LvalueExprHirNode()   {}
+func (IdentExprHir) LvalueExprHirNode()        {}
+func (MemberAccessExprHir) LvalueExprHirNode() {}
 
 func (OperatorCastExprHir) CastExprHirNode() {}
 func (DownCastExprHir) CastExprHirNode()     {}
