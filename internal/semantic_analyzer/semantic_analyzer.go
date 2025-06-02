@@ -1075,52 +1075,36 @@ func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.B
 }
 
 func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.AssignExprHir {
-	varDef, defined := sa.scope.lookupVar(assignExpr.Ident.Value)
-	if !defined {
-		_, defined := sa.funcArgs[assignExpr.Ident.Value]
-		if !defined {
+	if unaryExpr, ok := assignExpr.Left.(ast.UnaryExpr); ok {
+		op := unaryExpr.GetOp()
+		switch op.Kind {
+		case lexer.ASTERISK, lexer.BAND:
+			break
+		default:
 			sa.eh.AddError(
 				newSemanticError(
-					fmt.Sprintf("variable %s not defined", assignExpr.Ident.Value),
-					assignExpr.StartToken.Metadata.FileName,
-					assignExpr.StartToken.Metadata.Line,
-					assignExpr.StartToken.Metadata.Column,
+					fmt.Sprintf("assignment cannot be used with unary operator %s", op.Value),
+					assignExpr.Op.Metadata.FileName,
+					assignExpr.Op.Metadata.Line,
+					assignExpr.Op.Metadata.Column,
 				),
 			)
 			return nil
 		}
+	}
 
-		sa.eh.AddError(
-			newSemanticError(
-				"cannot assign to a function argument",
-				assignExpr.Op.Metadata.FileName,
-				assignExpr.Op.Metadata.Line,
-				assignExpr.Op.Metadata.Column,
-			),
-		)
+	left := sa.analyzeExpr(assignExpr.Left)
+	if hir.IsNilExpr(left) {
 		return nil
 	}
 
-	expr := sa.analyzeExpr(assignExpr.Value)
-
-	if hir.IsNilExpr(expr) {
+	right := sa.analyzeExpr(assignExpr.Right)
+	if hir.IsNilExpr(right) {
 		return nil
 	}
 
-	if varDef.Const {
-		sa.eh.AddError(
-			newSemanticError(
-				"cannot assign to a constant",
-				assignExpr.Op.Metadata.FileName,
-				assignExpr.Op.Metadata.Line,
-				assignExpr.Op.Metadata.Column,
-			),
-		)
-		return nil
-	}
-
-	expr = sa.tryImplicitCast(expr, varDef.Type)
-	if varDef.Type != expr.ExprType() {
+	right = sa.tryImplicitCast(right, left.ExprType())
+	if right.ExprType() != left.ExprType() {
 		sa.eh.AddError(
 			newSemanticError(
 				"assignment type mismatch",
@@ -1136,84 +1120,81 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 	case lexer.ASSIGN:
 		break
 	case lexer.ADD_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinaryAdd,
-			Right: expr,
+			Right: right,
 		}
 	case lexer.SUB_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinarySub,
-			Right: expr,
+			Right: right,
 		}
 	case lexer.MUL_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinaryMul,
-			Right: expr,
+			Right: right,
 		}
 	case lexer.DIV_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinaryDiv,
-			Right: expr,
+			Right: right,
 		}
 	case lexer.MOD_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinaryMod,
-			Right: expr,
+			Right: right,
 		}
 	case lexer.BAND_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinaryBand,
-			Right: expr,
+			Right: right,
 		}
 	case lexer.BOR_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinaryBor,
-			Right: expr,
+			Right: right,
 		}
 	case lexer.XOR_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinaryXor,
-			Right: expr,
+			Right: right,
 		}
 	case lexer.SHL_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinaryShl,
-			Right: expr,
+			Right: right,
 		}
 	case lexer.SHR_ASSIGN:
-		expr = &hir.BinaryExprHir{
-			Type:  varDef.Type,
-			Left:  &hir.IdentExprHir{Type: varDef.Type, Name: assignExpr.Ident.Value},
+		right = &hir.BinaryExprHir{
+			Type:  left.ExprType(),
+			Left:  left,
 			Op:    hir.BinaryShr,
-			Right: expr,
+			Right: right,
 		}
 	}
 
 	return &hir.AssignExprHir{
-		Type:  varDef.Type,
-		Value: expr,
-		Ident: &hir.IdentExprHir{
-			Type: varDef.Type,
-			Name: assignExpr.Ident.Value,
-		},
+		Type:  left.ExprType(),
+		Left:  left,
+		Right: right,
 	}
 }
 
