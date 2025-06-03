@@ -76,6 +76,12 @@ type AssignExpr struct {
 	Right Expr
 }
 
+type ArrayExpr struct {
+	StartToken *lexer.Token
+
+	Elements []Expr
+}
+
 type CallExpr struct {
 	StartToken *lexer.Token
 
@@ -153,6 +159,7 @@ func (CharExpr) AstNode()              {}
 func (StringExpr) AstNode()            {}
 func (IdentExpr) AstNode()             {}
 func (AssignExpr) AstNode()            {}
+func (ArrayExpr) AstNode()             {}
 func (CallExpr) AstNode()              {}
 func (TypeInstantiationExpr) AstNode() {}
 func (TypeConstructionExpr) AstNode()  {}
@@ -170,6 +177,7 @@ func (e *CharExpr) FirstToken() *lexer.Token              { return e.StartToken 
 func (e *StringExpr) FirstToken() *lexer.Token            { return e.StartToken }
 func (e *IdentExpr) FirstToken() *lexer.Token             { return e.StartToken }
 func (e *AssignExpr) FirstToken() *lexer.Token            { return e.StartToken }
+func (e *ArrayExpr) FirstToken() *lexer.Token             { return e.StartToken }
 func (e *CallExpr) FirstToken() *lexer.Token              { return e.StartToken }
 func (e *TypeInstantiationExpr) FirstToken() *lexer.Token { return e.StartToken }
 func (e *TypeConstructionExpr) FirstToken() *lexer.Token  { return e.StartToken }
@@ -187,6 +195,7 @@ func (CharExpr) ExprNode()              {}
 func (StringExpr) ExprNode()            {}
 func (IdentExpr) ExprNode()             {}
 func (AssignExpr) ExprNode()            {}
+func (ArrayExpr) ExprNode()             {}
 func (CallExpr) ExprNode()              {}
 func (TypeInstantiationExpr) ExprNode() {}
 func (TypeConstructionExpr) ExprNode()  {}
@@ -200,5 +209,5 @@ func (BinaryExpr) ExprNode()            {}
 func (PrefixExpr) UnaryExprNode()  {}
 func (PostfixExpr) UnaryExprNode() {}
 
-func (e *PrefixExpr) GetOp() *lexer.Token { return e.Op }
+func (e *PrefixExpr) GetOp() *lexer.Token  { return e.Op }
 func (e *PostfixExpr) GetOp() *lexer.Token { return e.Op }

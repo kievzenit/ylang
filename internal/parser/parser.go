@@ -937,6 +937,8 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 	switch p.curr.Kind {
 	case lexer.LPAREN:
 		expr = p.parseParenExpr()
+	case lexer.LBRACKET:
+		expr = p.parseArrayExpression()
 	case lexer.IDENT:
 		p.read()
 		if p.curr.Kind == lexer.LPAREN {
@@ -1082,6 +1084,33 @@ func (p *Parser) parseParenExpr() ast.Expr {
 	p.read()
 
 	return expr
+}
+
+func (p *Parser) parseArrayExpression() ast.Expr {
+	p.expect(lexer.LBRACKET)
+	startToken := p.curr
+	p.read()
+
+	elements := make([]ast.Expr, 0)
+	expr := p.parseExpr()
+	elements = append(elements, expr)
+
+	for p.scanner.HasTokens() && p.curr.Kind != lexer.RBRACKET {
+		p.expect(lexer.COMMA)
+		p.read()
+
+		expr := p.parseExpr()
+		elements = append(elements, expr)
+	}
+
+	p.expect(lexer.RBRACKET)
+	p.read()
+
+	return &ast.ArrayExpr{
+		StartToken: startToken,
+
+		Elements: elements,
+	}
 }
 
 func (p *Parser) parseTypeExpr() ast.Expr {
