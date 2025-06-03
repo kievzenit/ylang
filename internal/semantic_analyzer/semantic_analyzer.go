@@ -1190,7 +1190,7 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 
 	return &hir.AssignExprHir{
 		Type:  left.ExprType(),
-		Left:  left,
+		Left:  left.(hir.LvalueExprHir),
 		Right: right,
 	}
 }
