@@ -567,6 +567,37 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 	}
 }
 
+func (e *Emitter) getPtrToMemberAccessExprHir(memberAccessExprHir *hir.MemberAccessExprHir, depth int) llvm.Value {
+	var leftValue llvm.Value
+	if leftIdentExprHir, ok := memberAccessExprHir.Left.(*hir.IdentExprHir); ok {
+		leftValue = e.variablesMap[leftIdentExprHir.Name]
+	} else if leftMemberExprHir, ok := memberAccessExprHir.Left.(*hir.MemberAccessExprHir); ok {
+		leftValue = e.getPtrToMemberAccessExprHir(leftMemberExprHir, depth+1)
+	} else {
+		panic("unreachable")
+	}
+
+	leftMemberType, ok := memberAccessExprHir.Left.ExprType().(*hir_types.UserType)
+	if !ok {
+		panic("member access should be user type")
+	}
+
+	rightIdentExprHir, ok := memberAccessExprHir.Right.(*hir.IdentExprHir)
+	if !ok {
+		panic("unreachable")
+	}
+
+	memberPosition := leftMemberType.MemberPositions[rightIdentExprHir.Name]
+	memberGep := e.builder.CreateStructGEP(
+		e.getLlvmTypeForType(leftMemberType),
+		leftValue,
+		memberPosition,
+		fmt.Sprintf("%s::%s", leftMemberType.Name, rightIdentExprHir.Name),
+	)
+
+	return memberGep
+}
+
 func (e *Emitter) getPtrToLvalueExprHirValue(lvalueExprHir hir.LvalueExprHir) llvm.Value {
 	switch lvalueExprHir.(type) {
 	case *hir.IdentExprHir:
@@ -574,7 +605,17 @@ func (e *Emitter) getPtrToLvalueExprHirValue(lvalueExprHir hir.LvalueExprHir) ll
 		identValue := e.variablesMap[identExprHir.Name]
 		return identValue
 	case *hir.MemberAccessExprHir:
-		panic("not implemented")
+		memberExprHir := lvalueExprHir.(*hir.MemberAccessExprHir)
+		return e.getPtrToMemberAccessExprHir(memberExprHir, 0)
+	case *hir.PrefixExprHir:
+		prefixExprHir := lvalueExprHir.(*hir.PrefixExprHir)
+		// assuming that prefix expression is always * operator
+		ptrPtrValue := e.getPtrToLvalueExprHirValue(prefixExprHir.Expr.(hir.LvalueExprHir))
+		return e.builder.CreateLoad(
+			e.getLlvmTypeForType(prefixExprHir.Expr.ExprType()), 
+			ptrPtrValue, 
+			"loadtmp",
+		)
 	default:
 		panic("unreachable")
 	}
@@ -621,9 +662,9 @@ func (e *Emitter) emitForDownCastExprHir(downCastExprHir *hir.DownCastExprHir) l
 }
 
 func (e *Emitter) emitForAssignExprHir(assignExprHir *hir.AssignExprHir) llvm.Value {
-	allocValue := e.variablesMap[assignExprHir.Ident.Name]
-	value := e.emitForExprHir(assignExprHir.Value)
-	e.builder.CreateStore(value, allocValue)
+	ptrValue := e.getPtrToLvalueExprHirValue(assignExprHir.Left)
+	value := e.emitForExprHir(assignExprHir.Right)
+	e.builder.CreateStore(value, ptrValue)
 	return value
 }
 
@@ -896,6 +937,7 @@ func (e *Emitter) emitForMemberAccessExprHir(memberAccessExprHir *hir.MemberAcce
 	}
 
 	memberPosition := leftMemberType.MemberPositions[rightIdentExprHir.Name]
+	// used with bar().member access
 	if leftValue.Type().TypeKind() == llvm.StructTypeKind {
 		return e.builder.CreateExtractValue(leftValue, memberPosition, "memberaccesstmp")
 	}
