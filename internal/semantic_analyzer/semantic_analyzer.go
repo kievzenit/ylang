@@ -1077,10 +1077,7 @@ func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.B
 func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.AssignExprHir {
 	if unaryExpr, ok := assignExpr.Left.(ast.UnaryExpr); ok {
 		op := unaryExpr.GetOp()
-		switch op.Kind {
-		case lexer.ASTERISK, lexer.BAND:
-			break
-		default:
+		if op.Kind != lexer.ASTERISK {
 			sa.eh.AddError(
 				newSemanticError(
 					fmt.Sprintf("assignment cannot be used with unary operator %s", op.Value),
