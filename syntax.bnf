@@ -114,6 +114,7 @@
 <primary_expression> ::= <literal_expression>
     | <identifier_expression>
     | <parenthesis_expression>
+    | <array_expression>
     | <call_expression>
     | <type_creation_expression>
     | <member_access_expression>
@@ -130,6 +131,7 @@
 
 <call_expression> ::= <identifier_literal> "(" (<expression> ("," <expression>)*)? ")"
 <parenthesis_expression> ::= "(" <expression> ")"
+<array_expression> ::= "[" (<expression> ("," <expression>)*)? "]"
 <identifier_expression> ::= <identifier_literal>
 
 <type_creation_expression> ::= <type_instantiation_expression> | <type_construction_expression>
