@@ -990,6 +990,8 @@ func (sa *SemanticAnalyzer) analyzeExpr(expr ast.Expr) hir.ExprHir {
 		return sa.analyzeTypeInstantiationExpr(expr.(*ast.TypeInstantiationExpr))
 	case *ast.MemberAccessExpr:
 		return sa.analyzeMemberAccessExpr(expr.(*ast.MemberAccessExpr))
+	case *ast.ArrayExpr:
+		return sa.analyzeArrayExpr(expr.(*ast.ArrayExpr))
 	case *ast.CallExpr:
 		return sa.analyzeCallExpr(expr.(*ast.CallExpr))
 	case *ast.IdentExpr:
@@ -1523,6 +1525,48 @@ func (sa *SemanticAnalyzer) analyzeMemberAccessExpr(memberAccessExpr *ast.Member
 		panic("not implemented")
 	default:
 		panic("unreachable")
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeArrayExpr(arrayExpr *ast.ArrayExpr) *hir.ArrayExprHir {
+	elements := make([]hir.ExprHir, 0)
+	exprHir := sa.analyzeExpr(arrayExpr.Elements[0])
+	if hir.IsNilExpr(exprHir) {
+		return nil
+	}
+
+	errorOccured := false
+	arrayItemType := exprHir.ExprType()
+	for _, expr := range arrayExpr.Elements[1:] {
+		exprHir = sa.analyzeExpr(expr)
+		if hir.IsNilExpr(exprHir) {
+			return nil
+		}
+
+		exprHir = sa.tryImplicitCast(exprHir, arrayItemType)
+		if exprHir.ExprType() != arrayItemType {
+			sa.eh.AddError(
+				newSemanticError(
+					"array element type mismatch",
+					expr.FirstToken().Metadata.FileName,
+					expr.FirstToken().Metadata.Line,
+					expr.FirstToken().Metadata.Column,
+				),
+			)
+			errorOccured = true
+			continue
+		}
+
+		elements = append(elements, exprHir)
+	}
+
+	if errorOccured {
+		return nil
+	}
+
+	return &hir.ArrayExprHir{
+		Type:     &types.ArrayType{ItemType: arrayItemType, Size: len(elements)},
+		Elements: elements,
 	}
 }
 

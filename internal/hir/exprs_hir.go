@@ -77,6 +77,11 @@ type MemberAccessExprHir struct {
 	Right ExprHir
 }
 
+type ArrayExprHir struct {
+	types.Type
+	Elements []ExprHir
+}
+
 type CallExprHir struct {
 	types.Type
 	Name string
@@ -231,6 +236,7 @@ func (ArgIdentExprHir) ExprHirNode()          {}
 func (AssignExprHir) ExprHirNode()            {}
 func (TypeInstantiationExprHir) ExprHirNode() {}
 func (MemberAccessExprHir) ExprHirNode()      {}
+func (ArrayExprHir) ExprHirNode()             {}
 func (CallExprHir) ExprHirNode()              {}
 func (PrefixExprHir) ExprHirNode()            {}
 func (PostfixExprHir) ExprHirNode()           {}
@@ -247,6 +253,7 @@ func (e ArgIdentExprHir) ExprType() types.Type          { return e.Type }
 func (e AssignExprHir) ExprType() types.Type            { return e.Type }
 func (e TypeInstantiationExprHir) ExprType() types.Type { return e.Type }
 func (e MemberAccessExprHir) ExprType() types.Type      { return e.Type }
+func (e ArrayExprHir) ExprType() types.Type             { return e.Type }
 func (e CallExprHir) ExprType() types.Type              { return e.Type }
 func (e PrefixExprHir) ExprType() types.Type            { return e.Type }
 func (e PostfixExprHir) ExprType() types.Type           { return e.Type }
@@ -263,6 +270,7 @@ func (ArgIdentExprHir) IsConst() bool          { return false }
 func (AssignExprHir) IsConst() bool            { return false }
 func (TypeInstantiationExprHir) IsConst() bool { return false }
 func (MemberAccessExprHir) IsConst() bool      { return false }
+func (ArrayExprHir) IsConst() bool             { return false }	
 func (CallExprHir) IsConst() bool              { return false }
 func (PrefixExprHir) IsConst() bool            { return false }
 func (PostfixExprHir) IsConst() bool           { return false }
