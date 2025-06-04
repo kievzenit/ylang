@@ -10,6 +10,13 @@ func (f *FloatType) Type() string {
 	return fmt.Sprintf("f%d", f.Bits)
 }
 
+func (f *FloatType) SameAs(t Type) bool {
+	if floatType, ok := t.(*FloatType); ok {
+		return f.Bits == floatType.Bits
+	}
+	return false
+}
+
 func (f *FloatType) GetMember(name string) (Type, bool) {
 	return nil, false
 }

@@ -6,6 +6,13 @@ func (BoolType) Type() string {
 	return "bool"
 }
 
+func (BoolType) SameAs(t Type) bool {
+	if _, ok := t.(*BoolType); ok {
+		return true
+	}
+	return false
+}
+
 func (BoolType) GetMember(name string) (Type, bool) {
 	return nil, false
 }

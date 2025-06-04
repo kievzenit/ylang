@@ -14,6 +14,13 @@ func (i *IntType) Type() string {
 	return fmt.Sprintf("u%d", i.Bits)
 }
 
+func (i *IntType) SameAs(t Type) bool {
+	if intType, ok := t.(*IntType); ok {
+		return i.Signed == intType.Signed && i.Bits == intType.Bits
+	}
+	return false
+}
+
 func (IntType) GetMember(name string) (Type, bool) {
 	return nil, false
 }

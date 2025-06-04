@@ -10,6 +10,24 @@ func (t *UserType) Type() string {
 	return t.Name
 }
 
+func (t *UserType) SameAs(other Type) bool {
+	if userType, ok := other.(*UserType); ok {
+		if t.Name != userType.Name {
+			return false
+		}
+		if len(t.Members) != len(userType.Members) {
+			return false
+		}
+		for name, member := range t.Members {
+			if otherMember, exists := userType.Members[name]; !exists || !member.SameAs(otherMember) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 func (t *UserType) GetMember(name string) (Type, bool) {
 	member, ok := t.Members[name]
 	return member, ok
