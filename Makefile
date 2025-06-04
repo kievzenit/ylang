@@ -6,5 +6,10 @@ run: build
 	clang -g -o .out/test .out/test.o .sources/test.c
 	./.out/test
 
+debug: build
+	clang -g -o .out/test .out/test.o .sources/test.c
+	gdb .out/test
+
+
 inspect: build
 	llvm-objdump -d -M intel .out/test.o | less
