@@ -223,7 +223,7 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFuncDeclStmts() {
 				)
 			}
 
-			if argType == sa.typeResolver.VoidType() {
+			if argType.SameAs(sa.typeResolver.VoidType()) {
 				sa.eh.AddError(
 					newSemanticError(
 						"argument cannot be of type void",
@@ -261,7 +261,7 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 	for position, member := range typeDeclStmt.Members {
 		memberType, ok := sa.typeResolver.GetType(member.Type)
 		switch {
-		case ok && memberType == sa.typeResolver.VoidType():
+		case ok && memberType.SameAs(sa.typeResolver.VoidType()):
 			sa.eh.AddError(
 				newSemanticError(
 					"member cannot be of type void",
@@ -271,7 +271,7 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 				),
 			)
 			continue
-		case ok && memberType != sa.typeResolver.VoidType():
+		case ok && !memberType.SameAs(sa.typeResolver.VoidType()):
 			members[member.Name] = memberType
 			memberPositions[member.Name] = position
 			continue
@@ -396,7 +396,7 @@ func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt) 
 		lastStmt = funcScope.Stmts[len(funcScope.Stmts)-1]
 	}
 	if _, ok := lastStmt.(*hir.ReturnStmtHir); !ok {
-		if functionType.ReturnType != sa.typeResolver.VoidType() {
+		if !functionType.ReturnType.SameAs(sa.typeResolver.VoidType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					"function must return a value",
@@ -483,7 +483,7 @@ func (sa *SemanticAnalyzer) analyzeIfStmt(ifStmt *ast.IfStmt) *hir.IfStmtHir {
 	}
 
 	condExpr = sa.tryImplicitCast(condExpr, sa.typeResolver.BoolType())
-	if condExpr.ExprType() != sa.typeResolver.BoolType() {
+	if !condExpr.ExprType().SameAs(sa.typeResolver.BoolType()) {
 		failed = true
 		sa.eh.AddError(
 			newSemanticError(
@@ -507,7 +507,7 @@ func (sa *SemanticAnalyzer) analyzeIfStmt(ifStmt *ast.IfStmt) *hir.IfStmtHir {
 		}
 
 		elseIfCond = sa.tryImplicitCast(elseIfCond, sa.typeResolver.BoolType())
-		if elseIfCond.ExprType() != sa.typeResolver.BoolType() {
+		if !elseIfCond.ExprType().SameAs(sa.typeResolver.BoolType()) {
 			failed = true
 			sa.eh.AddError(
 				newSemanticError(
@@ -575,7 +575,7 @@ func (sa *SemanticAnalyzer) analyzeWhileStmt(whileStmt *ast.WhileStmt) *hir.Whil
 	}
 
 	condExpr = sa.tryImplicitCast(condExpr, sa.typeResolver.BoolType())
-	if condExpr.ExprType() != sa.typeResolver.BoolType() {
+	if !condExpr.ExprType().SameAs(sa.typeResolver.BoolType()) {
 		sa.eh.AddError(
 			newSemanticError(
 				"while condition must be of type bool",
@@ -607,7 +607,7 @@ func (sa *SemanticAnalyzer) analyzeDoWhileStmt(doWhileStmt *ast.DoWhileStmt) *hi
 	}
 
 	condExpr = sa.tryImplicitCast(condExpr, sa.typeResolver.BoolType())
-	if condExpr.ExprType() != sa.typeResolver.BoolType() {
+	if !condExpr.ExprType().SameAs(sa.typeResolver.BoolType()) {
 		sa.eh.AddError(
 			newSemanticError(
 				"do while condition must be of type bool",
@@ -662,7 +662,7 @@ func (sa *SemanticAnalyzer) analyzeForStmt(forStmt *ast.ForStmt) *hir.ForStmtHir
 
 	if !hir.IsNilExpr(condExpr) {
 		condExpr = sa.tryImplicitCast(condExpr, sa.typeResolver.BoolType())
-		if condExpr.ExprType() != sa.typeResolver.BoolType() {
+		if !condExpr.ExprType().SameAs(sa.typeResolver.BoolType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					"for condition must be of type bool",
@@ -705,7 +705,7 @@ func (sa *SemanticAnalyzer) analyzeForStmt(forStmt *ast.ForStmt) *hir.ForStmtHir
 
 func (sa *SemanticAnalyzer) analyzeReturnStmt(returnStmt *ast.ReturnStmt) *hir.ReturnStmtHir {
 	if returnStmt.Expr == nil {
-		if sa.funcRetType != sa.typeResolver.VoidType() {
+		if !sa.funcRetType.SameAs(sa.typeResolver.VoidType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					"function must return a value",
@@ -728,7 +728,7 @@ func (sa *SemanticAnalyzer) analyzeReturnStmt(returnStmt *ast.ReturnStmt) *hir.R
 	}
 
 	valueExpr = sa.tryImplicitCast(valueExpr, sa.funcRetType)
-	if sa.funcRetType != valueExpr.ExprType() {
+	if !sa.funcRetType.SameAs(valueExpr.ExprType()) {
 		sa.eh.AddError(
 			newSemanticError(
 				"function return type mismatch",
@@ -824,7 +824,7 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 		return nil
 	}
 
-	if valueExpr.ExprType() == sa.typeResolver.VoidType() {
+	if valueExpr.ExprType().SameAs(sa.typeResolver.VoidType()) {
 		sa.eh.AddError(
 			newSemanticError(
 				"variable cannot be of type void",
@@ -850,7 +850,7 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 			return nil
 		}
 
-		if varExplicitType == sa.typeResolver.VoidType() {
+		if varExplicitType.SameAs(sa.typeResolver.VoidType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					"variable cannot be of type void",
@@ -864,7 +864,7 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 
 		valueExpr = sa.tryImplicitCast(valueExpr, varExplicitType)
 
-		if varExplicitType != valueExpr.ExprType() {
+		if !varExplicitType.SameAs(valueExpr.ExprType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					"variable type mismatch",
@@ -930,7 +930,7 @@ func (sa *SemanticAnalyzer) analyzeExpr(expr ast.Expr) hir.ExprHir {
 }
 
 func (sa *SemanticAnalyzer) tryImplicitCast(exprHir hir.ExprHir, hirType types.Type) hir.ExprHir {
-	if exprHir.ExprType() == hirType {
+	if exprHir.ExprType().SameAs(hirType) {
 		return exprHir
 	}
 
@@ -955,7 +955,7 @@ func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.B
 
 	left = sa.tryImplicitCast(left, right.ExprType())
 	right = sa.tryImplicitCast(right, left.ExprType())
-	if left.ExprType() != right.ExprType() {
+	if !left.ExprType().SameAs(right.ExprType()) {
 		sa.eh.AddError(
 			newSemanticError(
 				"binary expression operands must be of the same type",
@@ -972,7 +972,7 @@ func (sa *SemanticAnalyzer) analyzeBinaryExpr(binaryExpr *ast.BinaryExpr) *hir.B
 	case lexer.LAND, lexer.LOR:
 		left = sa.tryImplicitCast(left, sa.typeResolver.BoolType())
 		right = sa.tryImplicitCast(right, sa.typeResolver.BoolType())
-		if left.ExprType() != sa.typeResolver.BoolType() || right.ExprType() != sa.typeResolver.BoolType() {
+		if !left.ExprType().SameAs(sa.typeResolver.BoolType()) || !right.ExprType().SameAs(sa.typeResolver.BoolType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					"logical operator operands must be of type bool",
@@ -1025,7 +1025,7 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 	}
 
 	right = sa.tryImplicitCast(right, left.ExprType())
-	if right.ExprType() != left.ExprType() {
+	if !right.ExprType().SameAs(left.ExprType()) {
 		sa.eh.AddError(
 			newSemanticError(
 				"assignment type mismatch",
@@ -1217,7 +1217,7 @@ func (sa *SemanticAnalyzer) analyzePrefixExpr(prefixExpr *ast.PrefixExpr) hir.Ex
 		}
 	case lexer.XMARK:
 		rightExprHir = sa.tryImplicitCast(rightExprHir, sa.typeResolver.BoolType())
-		if rightExprHir.ExprType() != sa.typeResolver.BoolType() {
+		if !rightExprHir.ExprType().SameAs(sa.typeResolver.BoolType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					"unary NOT operator can only be applied to boolean types",
@@ -1366,7 +1366,7 @@ func (sa *SemanticAnalyzer) analyzeTypeInstantiationExpr(typeInstantiationExpr *
 		}
 
 		instantiationExpr = sa.tryImplicitCast(instantiationExpr, memberType)
-		if memberType != instantiationExpr.ExprType() {
+		if !memberType.SameAs(instantiationExpr.ExprType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					fmt.Sprintf("member %s type mismatch", instantiation.Name),
@@ -1467,7 +1467,7 @@ func (sa *SemanticAnalyzer) analyzeArrayExpr(arrayExpr *ast.ArrayExpr) *hir.Arra
 		}
 
 		exprHir = sa.tryImplicitCast(exprHir, arrayItemType)
-		if exprHir.ExprType() != arrayItemType {
+		if !exprHir.ExprType().SameAs(arrayItemType) {
 			sa.eh.AddError(
 				newSemanticError(
 					"array element type mismatch",
@@ -1516,7 +1516,7 @@ func (sa *SemanticAnalyzer) analyzeCallExpr(callExpr *ast.CallExpr) *hir.CallExp
 
 		argType := funcType.Args[i].Type
 		argExpr = sa.tryImplicitCast(argExpr, argType)
-		if argType != argExpr.ExprType() {
+		if !argType.SameAs(argExpr.ExprType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					"function call argument type mismatch",
@@ -1709,7 +1709,7 @@ func (sa *SemanticAnalyzer) analyzeCastExpr(castExpr *ast.CastExpr) hir.ExprHir 
 	}
 
 	left = sa.tryImplicitCast(left, newType)
-	if left.ExprType() == newType {
+	if left.ExprType().SameAs(newType) {
 		return left
 	}
 
