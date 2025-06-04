@@ -201,7 +201,7 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFuncDeclStmts() {
 		if !ok {
 			sa.eh.AddError(
 				newSemanticError(
-					fmt.Sprintf("return type %s not defined", funcDeclStmt.ReturnType),
+					fmt.Sprintf("return type %s not defined", funcDeclStmt.ReturnType.TypeName()),
 					funcDeclStmt.StartToken.Metadata.FileName,
 					funcDeclStmt.StartToken.Metadata.Line,
 					funcDeclStmt.StartToken.Metadata.Column,
