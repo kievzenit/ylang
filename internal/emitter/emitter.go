@@ -131,9 +131,8 @@ func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
 	for memberName, pos := range userType.MemberPositions {
 		memberType := userType.Members[memberName]
 		llvmTypeAlreadyExists := e.llvmTypeExistsForType(memberType)
-		llvmType := e.getLlvmTypeForType(memberType)
 		if llvmTypeAlreadyExists {
-			fieldTypes[pos] = llvmType
+			fieldTypes[pos] = e.getLlvmTypeForType(memberType)
 			continue
 		}
 
