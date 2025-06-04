@@ -1568,78 +1568,74 @@ func (sa *SemanticAnalyzer) analyzeIdentExpr(identExpr *ast.IdentExpr) hir.ExprH
 }
 
 func (sa *SemanticAnalyzer) analyzeIntExpr(intExpr *ast.IntExpr) *hir.IntExprHir {
-	if intExpr.ExplicitType == "" {
+	switch intExpr.ExplicitType {
+	case ast.IntNone:
 		return &hir.IntExprHir{
 			Type:  sa.typeResolver.IntType(32),
 			Value: intExpr.Value,
 		}
-	}
-
-	switch intExpr.ExplicitType {
-		case ast.Int8Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.IntType(8),
-				Value: intExpr.Value,
-			}
-		case ast.Int16Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.IntType(16),
-				Value: intExpr.Value,
-			}
-		case ast.Int32Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.IntType(32),
-				Value: intExpr.Value,
-			}
-		case ast.Int64Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.IntType(64),
-				Value: intExpr.Value,
-			}
-		case ast.Int128Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.IntType(128),
-				Value: intExpr.Value,
-			}
-		case ast.Uint8Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.UIntType(8),
-				Value: intExpr.Value,
-			}
-		case ast.Uint16Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.UIntType(16),
-				Value: intExpr.Value,
-			}
-		case ast.Uint32Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.UIntType(32),
-				Value: intExpr.Value,
-			}
-		case ast.Uint64Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.UIntType(64),
-				Value: intExpr.Value,
-			}
-		case ast.Uint128Type:
-			return &hir.IntExprHir{
-				Type:  sa.typeResolver.UIntType(128),
-				Value: intExpr.Value,
-			}
-		default:
-			panic("unreachable")
+	case ast.Int8Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.IntType(8),
+			Value: intExpr.Value,
+		}
+	case ast.Int16Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.IntType(16),
+			Value: intExpr.Value,
+		}
+	case ast.Int32Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.IntType(32),
+			Value: intExpr.Value,
+		}
+	case ast.Int64Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.IntType(64),
+			Value: intExpr.Value,
+		}
+	case ast.Int128Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.IntType(128),
+			Value: intExpr.Value,
+		}
+	case ast.Uint8Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.UIntType(8),
+			Value: intExpr.Value,
+		}
+	case ast.Uint16Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.UIntType(16),
+			Value: intExpr.Value,
+		}
+	case ast.Uint32Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.UIntType(32),
+			Value: intExpr.Value,
+		}
+	case ast.Uint64Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.UIntType(64),
+			Value: intExpr.Value,
+		}
+	case ast.Uint128Type:
+		return &hir.IntExprHir{
+			Type:  sa.typeResolver.UIntType(128),
+			Value: intExpr.Value,
+		}
+	default:
+		panic("unreachable")
 	}
 }
 
 func (sa *SemanticAnalyzer) analyzeFloatExpr(floatExpr *ast.FloatExpr) *hir.FloatExprHir {
-	if floatExpr.ExplicitType == ast.FloatNone {
+	switch floatExpr.ExplicitType {
+	case ast.FloatNone:
 		return &hir.FloatExprHir{
 			Type:  sa.typeResolver.FloatType(32),
 			Value: floatExpr.Value,
 		}
-	}
-
-	switch floatExpr.ExplicitType {
 	// case ast.Float16Type:
 	// 	return &hir.FloatExprHir{
 	// 		Type:  sa.typeResolver.FloatType(16),
