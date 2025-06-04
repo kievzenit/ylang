@@ -1534,6 +1534,7 @@ func (sa *SemanticAnalyzer) analyzeArrayExpr(arrayExpr *ast.ArrayExpr) *hir.Arra
 	if hir.IsNilExpr(exprHir) {
 		return nil
 	}
+	elements = append(elements, exprHir)
 
 	errorOccured := false
 	arrayItemType := exprHir.ExprType()
