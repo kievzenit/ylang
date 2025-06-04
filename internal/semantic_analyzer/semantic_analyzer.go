@@ -728,6 +728,10 @@ func (sa *SemanticAnalyzer) analyzeReturnStmt(returnStmt *ast.ReturnStmt) *hir.R
 	}
 
 	valueExpr = sa.tryImplicitCast(valueExpr, sa.funcRetType)
+	if sa.funcRetType == nil {
+		return nil
+	}
+
 	if !sa.funcRetType.SameAs(valueExpr.ExprType()) {
 		sa.eh.AddError(
 			newSemanticError(
