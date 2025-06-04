@@ -123,6 +123,16 @@ func (tr *TypeResolver) GetType(astType ast.TypeNode) (types.Type, bool) {
 		}, true
 	}
 
+	if ptrType, ok := astType.(*ast.PointerTypeNode); ok {
+		innerType, ok := tr.GetType(ptrType.InnerType)
+		if !ok {
+			return nil, false
+		}
+		return &types.PointerType{
+			InnerType: innerType,
+		}, true
+	}
+
 	if t, ok := tr.builtinTypesMap[astType.TypeName()]; ok {
 		return t, true
 	}
