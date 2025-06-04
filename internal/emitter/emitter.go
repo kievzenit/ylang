@@ -66,6 +66,10 @@ func (e *Emitter) llvmTypeExistsForType(hirType hir_types.Type) bool {
 		return e.llvmTypeExistsForType(ptrType.InnerType)
 	}
 
+	if arrayType, ok := hirType.(*hir_types.ArrayType); ok {
+		return e.llvmTypeExistsForType(arrayType.ItemType)
+	}
+
 	if _, ok := e.typesMap[hirType.Type()]; ok {
 		return true
 	}
@@ -76,6 +80,10 @@ func (e *Emitter) llvmTypeExistsForType(hirType hir_types.Type) bool {
 func (e *Emitter) getLlvmTypeForType(hirType hir_types.Type) llvm.Type {
 	if ptrType, ok := hirType.(*hir_types.PointerType); ok {
 		return llvm.PointerType(e.getLlvmTypeForType(ptrType.InnerType), 0)
+	}
+
+	if arrayType, ok := hirType.(*hir_types.ArrayType); ok {
+		return llvm.ArrayType(e.getLlvmTypeForType(arrayType.ItemType), arrayType.Size)
 	}
 
 	if llvmType, ok := e.typesMap[hirType.Type()]; ok {
@@ -299,6 +307,11 @@ func (e *Emitter) emitForVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
 	if typeInstantiationExprHir, ok := varDeclStmtHir.Value.(*hir.TypeInstantiationExprHir); ok {
 		varValue := e.emitForTypeInstantiationExprHir(typeInstantiationExprHir, allocValue)
 		e.builder.CreateStore(varValue, allocValue)
+		return
+	}
+
+	if arrayExprHir, ok := varDeclStmtHir.Value.(*hir.ArrayExprHir); ok {
+		e.emitForArrayExprHir(arrayExprHir, allocValue)
 		return
 	}
 
@@ -550,6 +563,8 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 		return e.emitForMemberAccessExprHir(exprHir.(*hir.MemberAccessExprHir), 0)
 	case *hir.BinaryExprHir:
 		return e.emitForBinExprHir(exprHir.(*hir.BinaryExprHir))
+	case *hir.ArrayExprHir:
+		return e.emitForArrayExprHir(exprHir.(*hir.ArrayExprHir), llvm.Value{})
 	case *hir.IdentExprHir:
 		return e.emitForIdentExprHir(exprHir.(*hir.IdentExprHir))
 	case *hir.ArgIdentExprHir:
@@ -1203,6 +1218,36 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 	default:
 		panic("not implemented")
 	}
+}
+
+func (e *Emitter) emitForArrayExprHir(arrayExprHir *hir.ArrayExprHir, ptrToArray llvm.Value) llvm.Value {
+	arrayType := arrayExprHir.ExprType().(*hir_types.ArrayType)
+
+	if ptrToArray.IsNil() {
+		currentBasicBlock := e.builder.GetInsertBlock()
+		e.builder.SetInsertPointAtEnd(e.currentAllocBasicBlock)
+		ptrToArray = e.builder.CreateAlloca(
+			e.getLlvmTypeForType(arrayType),
+			fmt.Sprintf("invisible_array_%s", arrayType.ItemType.Type()),
+		)
+		e.builder.SetInsertPointAtEnd(currentBasicBlock)
+	}
+
+	value := e.emitForExprHir(arrayExprHir.Elements[0])
+	e.builder.CreateStore(value, ptrToArray)
+
+	for i, exprHir := range arrayExprHir.Elements[1:] {
+		arrayGep := e.builder.CreateInBoundsGEP(
+			e.getLlvmTypeForType(arrayType.ItemType),
+			ptrToArray,
+			[]llvm.Value{llvm.ConstInt(e.typesMap["i32"], uint64(i+1), false)},
+			"arraygep",
+		)
+		value := e.emitForExprHir(exprHir)
+		e.builder.CreateStore(value, arrayGep)
+	}
+
+	return ptrToArray
 }
 
 func (e *Emitter) emitForArgIdentExprHir(argIdentExprHir *hir.ArgIdentExprHir) llvm.Value {
