@@ -147,58 +147,6 @@ func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
 	customStruct.StructSetBody(fieldTypes, false)
 	e.typesMap[userType.Name] = customStruct
 
-	initFunctionParams := make([]llvm.Type, 0, len(userType.Members)+1)
-	initFunctionParams = append(initFunctionParams, llvm.PointerType(customStruct, 0))
-	initFunctionParams = append(initFunctionParams, fieldTypes...)
-
-	initFunctionType := llvm.FunctionType(e.context.VoidType(), initFunctionParams, false)
-	initFunction := llvm.AddFunction(
-		e.module,
-		fmt.Sprintf("compiler::%s::init", userType.Name),
-		initFunctionType)
-	initFunction.SetLinkage(llvm.PrivateLinkage)
-	alwaysInlineAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("alwaysinline"), 0)
-	noCallbackAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nocallback"), 0)
-	noMergeAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nomerge"), 0)
-	noRecurseAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("norecurse"), 0)
-	willReturnAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("willreturn"), 0)
-	noSyncAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nosync"), 0)
-	noUnwindAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nounwind"), 0)
-	initFunction.AddFunctionAttr(alwaysInlineAttr)
-	initFunction.AddFunctionAttr(noCallbackAttr)
-	initFunction.AddFunctionAttr(noMergeAttr)
-	initFunction.AddFunctionAttr(noRecurseAttr)
-	initFunction.AddFunctionAttr(willReturnAttr)
-	initFunction.AddFunctionAttr(noSyncAttr)
-	initFunction.AddFunctionAttr(noUnwindAttr)
-	e.initFunctionsMap[userType.Name] = initFunction
-
-	noaliasAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("noalias"), 0)
-	writableAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("writable"), 0)
-	nonnullAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nonnull"), 0)
-	nocaptureAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nocapture"), 0)
-	sretAttr := e.context.CreateTypeAttribute(llvm.AttributeKindID("sret"), customStruct)
-	initFunction.AddAttributeAtIndex(1, noaliasAttr)
-	initFunction.AddAttributeAtIndex(1, writableAttr)
-	initFunction.AddAttributeAtIndex(1, nonnullAttr)
-	initFunction.AddAttributeAtIndex(1, nocaptureAttr)
-	initFunction.AddAttributeAtIndex(1, sretAttr)
-
-	entryBasicBlock := e.context.AddBasicBlock(initFunction, "entry")
-	e.builder.SetInsertPointAtEnd(entryBasicBlock)
-	firstParam := initFunction.Param(0)
-	for memberName := range userType.Members {
-		memberPosition := userType.MemberPositions[memberName]
-		memberGep := e.builder.CreateStructGEP(
-			customStruct,
-			firstParam,
-			memberPosition+1,
-			fmt.Sprintf("%s::%s", userType.Name, memberName),
-		)
-		e.builder.CreateStore(initFunction.Param(memberPosition+1), memberGep)
-	}
-	e.builder.CreateRetVoid()
-
 	return customStruct
 }
 
@@ -213,6 +161,7 @@ func (e *Emitter) declareFuncPrototypes() {
 		funcType := llvm.FunctionType(returnType, argsTypes, false)
 		funcValue := llvm.AddFunction(e.module, funcName, funcType)
 		e.funcsMap[funcName] = funcValue
+		funcValue.SetFunctionCallConv(llvm.CCallConv)
 
 		framePointerAttr := e.context.CreateStringAttribute("frame-pointer", "all")
 		noTrappingMathAttr := e.context.CreateStringAttribute("no-trapping-math", "true")
@@ -317,12 +266,9 @@ func (e *Emitter) emitForVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
 	e.builder.SetInsertPointAtEnd(currBasicBlock)
 
 	if typeInstantiationExprHir, ok := varDeclStmtHir.Value.(*hir.TypeInstantiationExprHir); ok {
-		varValue := e.emitForTypeInstantiationExprHir(typeInstantiationExprHir, allocValue)
-		e.builder.CreateStore(varValue, allocValue)
+		e.emitForTypeInstantiationExprHir(typeInstantiationExprHir, allocValue)
 		return
-	}
-
-	if arrayExprHir, ok := varDeclStmtHir.Value.(*hir.ArrayExprHir); ok {
+	} else if arrayExprHir, ok := varDeclStmtHir.Value.(*hir.ArrayExprHir); ok {
 		e.emitForArrayExprHir(arrayExprHir, allocValue)
 		return
 	}
@@ -922,36 +868,25 @@ func (e *Emitter) emitForTypeInstantiationExprHir(typeInstantiationExprHir *hir.
 		e.builder.SetInsertPointAtEnd(currentBasicBlock)
 	}
 
-	initFunction := e.initFunctionsMap[typeInstantiationExprHir.TypeName]
-
-	args := make([]llvm.Value, len(typeInstantiationExprHir.Instantiations)+1)
-	args[0] = ptrToStruct
 	for _, instantiation := range typeInstantiationExprHir.Instantiations {
-		var value llvm.Value
+		memberGep := e.builder.CreateStructGEP(
+			structLlvmType,
+			ptrToStruct,
+			instantiation.MemberPosition,
+			fmt.Sprintf("%s::%s", typeInstantiationExprHir.TypeName, instantiation.MemberName),
+		)
+
 		if innerTypeInstantiationExprHir, ok := instantiation.ExprHir.(*hir.TypeInstantiationExprHir); ok {
-			memberGep := e.builder.CreateStructGEP(
-				structLlvmType,
-				ptrToStruct,
-				instantiation.MemberPosition,
-				fmt.Sprintf("%s::%s", typeInstantiationExprHir.TypeName, instantiation.MemberName),
-			)
-			value = e.emitForTypeInstantiationExprHir(innerTypeInstantiationExprHir, memberGep)
+			e.emitForTypeInstantiationExprHir(innerTypeInstantiationExprHir, memberGep)
+			continue
 		} else if arrayExprHir, ok := instantiation.ExprHir.(*hir.ArrayExprHir); ok {
-			memberGep := e.builder.CreateStructGEP(
-				structLlvmType,
-				ptrToStruct,
-				instantiation.MemberPosition,
-				fmt.Sprintf("%s::%s", typeInstantiationExprHir.TypeName, instantiation.MemberName),
-			)
-			value = e.emitForArrayExprHir(arrayExprHir, memberGep)
-		} else {
-			value = e.emitForExprHir(instantiation.ExprHir)
+			e.emitForArrayExprHir(arrayExprHir, memberGep)
+			continue
 		}
 
-		args[instantiation.MemberPosition+1] = value
+		value := e.emitForExprHir(instantiation.ExprHir)
+		e.builder.CreateStore(value, memberGep)
 	}
-
-	e.builder.CreateCall(initFunction.GlobalValueType(), initFunction, args, "")
 
 	if ptrCreated {
 		return e.builder.CreateLoad(structLlvmType, ptrToStruct, "loadtmp")
