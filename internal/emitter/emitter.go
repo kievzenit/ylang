@@ -519,6 +519,8 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 		return e.emitForTypeInstantiationExprHir(exprHir.(*hir.TypeInstantiationExprHir), llvm.Value{})
 	case *hir.MemberAccessExprHir:
 		return e.emitForMemberAccessExprHir(exprHir.(*hir.MemberAccessExprHir), 0)
+	case *hir.ArraySubscriptExprHir:
+		return e.emitForArraySubscriptExprHir(exprHir.(*hir.ArraySubscriptExprHir), 0)
 	case *hir.BinaryExprHir:
 		return e.emitForBinExprHir(exprHir.(*hir.BinaryExprHir))
 	case *hir.ArrayExprHir:
@@ -580,6 +582,18 @@ func (e *Emitter) getPtrToLvalueExprHirValue(lvalueExprHir hir.LvalueExprHir) ll
 	case *hir.MemberAccessExprHir:
 		memberExprHir := lvalueExprHir.(*hir.MemberAccessExprHir)
 		return e.getPtrToMemberAccessExprHir(memberExprHir, 0)
+	case *hir.ArraySubscriptExprHir:
+		arraySubscriptExprHir := lvalueExprHir.(*hir.ArraySubscriptExprHir)
+		itemPtr := e.getPtrToLvalueExprHirValue(arraySubscriptExprHir.Left.(hir.LvalueExprHir))
+		indexValue := e.emitForExprHir(arraySubscriptExprHir.Index)
+		
+		llvmItemType := e.getLlvmTypeForType(arraySubscriptExprHir.Type)
+		return e.builder.CreateInBoundsGEP(
+			llvmItemType,
+			itemPtr,
+			[]llvm.Value{indexValue},
+			"arraygeptmp",
+		)
 	case *hir.PrefixExprHir:
 		prefixExprHir := lvalueExprHir.(*hir.PrefixExprHir)
 		// assuming that prefix expression is always * operator
@@ -934,6 +948,35 @@ func (e *Emitter) emitForMemberAccessExprHir(memberAccessExprHir *hir.MemberAcce
 	}
 
 	return memberGep
+}
+
+func (e *Emitter) emitForArraySubscriptExprHir(arraySubscriptExprHir *hir.ArraySubscriptExprHir, depth int) llvm.Value {
+	var itemPtr llvm.Value
+	if leftIdentExprHir, ok := arraySubscriptExprHir.Left.(*hir.IdentExprHir); ok {
+		itemPtr = e.variablesMap[leftIdentExprHir.Name]
+	} else if leftMemberExprHir, ok := arraySubscriptExprHir.Left.(*hir.MemberAccessExprHir); ok {
+		itemPtr = e.getPtrToLvalueExprHirValue(leftMemberExprHir)
+	} else if leftArraySubscriptExprHir, ok := arraySubscriptExprHir.Left.(*hir.ArraySubscriptExprHir); ok {
+		itemPtr = e.emitForArraySubscriptExprHir(leftArraySubscriptExprHir, depth+1)
+	} else {
+		itemPtr = e.emitForExprHir(arraySubscriptExprHir.Left)
+	}
+
+	indexValue := e.emitForExprHir(arraySubscriptExprHir.Index)
+	llvmItemType := e.getLlvmTypeForType(arraySubscriptExprHir.Type)
+
+	gep := e.builder.CreateInBoundsGEP(
+		llvmItemType,
+		itemPtr,
+		[]llvm.Value{indexValue},
+		"arraysubscripttmp",
+	)
+
+	if depth == 0 {
+		return e.builder.CreateLoad(llvmItemType, gep, "loadtmp")
+	}
+
+	return gep
 }
 
 func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
