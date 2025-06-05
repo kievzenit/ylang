@@ -147,7 +147,11 @@ func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
 	customStruct.StructSetBody(fieldTypes, false)
 	e.typesMap[userType.Name] = customStruct
 
-	initFunctionType := llvm.FunctionType(customStruct, fieldTypes, false)
+	initFunctionParams := make([]llvm.Type, 0, len(userType.Members)+1)
+	initFunctionParams = append(initFunctionParams, llvm.PointerType(customStruct, 0))
+	initFunctionParams = append(initFunctionParams, fieldTypes...)
+
+	initFunctionType := llvm.FunctionType(e.context.VoidType(), initFunctionParams, false)
 	initFunction := llvm.AddFunction(
 		e.module,
 		fmt.Sprintf("compiler::%s::init", userType.Name),
@@ -169,22 +173,31 @@ func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
 	initFunction.AddFunctionAttr(noUnwindAttr)
 	e.initFunctionsMap[userType.Name] = initFunction
 
+	noaliasAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("noalias"), 0)
+	writableAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("writable"), 0)
+	nonnullAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nonnull"), 0)
+	nocaptureAttr := e.context.CreateEnumAttribute(llvm.AttributeKindID("nocapture"), 0)
+	sretAttr := e.context.CreateTypeAttribute(llvm.AttributeKindID("sret"), customStruct)
+	initFunction.AddAttributeAtIndex(1, noaliasAttr)
+	initFunction.AddAttributeAtIndex(1, writableAttr)
+	initFunction.AddAttributeAtIndex(1, nonnullAttr)
+	initFunction.AddAttributeAtIndex(1, nocaptureAttr)
+	initFunction.AddAttributeAtIndex(1, sretAttr)
+
 	entryBasicBlock := e.context.AddBasicBlock(initFunction, "entry")
 	e.builder.SetInsertPointAtEnd(entryBasicBlock)
-	initRetAlloca := e.builder.CreateAlloca(customStruct, "inittmp")
+	firstParam := initFunction.Param(0)
 	for memberName := range userType.Members {
 		memberPosition := userType.MemberPositions[memberName]
 		memberGep := e.builder.CreateStructGEP(
 			customStruct,
-			initRetAlloca,
-			memberPosition,
+			firstParam,
+			memberPosition+1,
 			fmt.Sprintf("%s::%s", userType.Name, memberName),
 		)
-		e.builder.CreateStore(initFunction.Param(memberPosition), memberGep)
+		e.builder.CreateStore(initFunction.Param(memberPosition+1), memberGep)
 	}
-
-	loadedRetValue := e.builder.CreateLoad(customStruct, initRetAlloca, "initrettmp")
-	e.builder.CreateRet(loadedRetValue)
+	e.builder.CreateRetVoid()
 
 	return customStruct
 }
@@ -626,8 +639,8 @@ func (e *Emitter) getPtrToLvalueExprHirValue(lvalueExprHir hir.LvalueExprHir) ll
 		// assuming that prefix expression is always * operator
 		ptrPtrValue := e.getPtrToLvalueExprHirValue(prefixExprHir.Expr.(hir.LvalueExprHir))
 		return e.builder.CreateLoad(
-			e.getLlvmTypeForType(prefixExprHir.Expr.ExprType()), 
-			ptrPtrValue, 
+			e.getLlvmTypeForType(prefixExprHir.Expr.ExprType()),
+			ptrPtrValue,
 			"loadtmp",
 		)
 	default:
@@ -895,39 +908,56 @@ func (e *Emitter) emitForPostfixExprHir(postfixExprHir *hir.PostfixExprHir) llvm
 }
 
 func (e *Emitter) emitForTypeInstantiationExprHir(typeInstantiationExprHir *hir.TypeInstantiationExprHir, ptrToStruct llvm.Value) llvm.Value {
+	ptrCreated := false
+	structLlvmType := e.getLlvmTypeForType(typeInstantiationExprHir.Type)
+
 	if ptrToStruct.IsNil() {
+		ptrCreated = true
 		currentBasicBlock := e.builder.GetInsertBlock()
 		e.builder.SetInsertPointAtEnd(e.currentAllocBasicBlock)
 		ptrToStruct = e.builder.CreateAlloca(
-			e.typesMap[typeInstantiationExprHir.TypeName],
-			typeInstantiationExprHir.TypeName,
+			structLlvmType,
+			fmt.Sprintf("invisible_var_%s", typeInstantiationExprHir.TypeName),
 		)
 		e.builder.SetInsertPointAtEnd(currentBasicBlock)
 	}
 
 	initFunction := e.initFunctionsMap[typeInstantiationExprHir.TypeName]
 
-	args := make([]llvm.Value, len(typeInstantiationExprHir.Instantiations))
+	args := make([]llvm.Value, len(typeInstantiationExprHir.Instantiations)+1)
+	args[0] = ptrToStruct
 	for _, instantiation := range typeInstantiationExprHir.Instantiations {
+		var value llvm.Value
 		if innerTypeInstantiationExprHir, ok := instantiation.ExprHir.(*hir.TypeInstantiationExprHir); ok {
 			memberGep := e.builder.CreateStructGEP(
-				e.typesMap[typeInstantiationExprHir.TypeName],
+				structLlvmType,
 				ptrToStruct,
 				instantiation.MemberPosition,
 				fmt.Sprintf("%s::%s", typeInstantiationExprHir.TypeName, instantiation.MemberName),
 			)
-			memberValue := e.emitForTypeInstantiationExprHir(innerTypeInstantiationExprHir, memberGep)
-
-			args[instantiation.MemberPosition] = memberValue
-
-			continue
+			value = e.emitForTypeInstantiationExprHir(innerTypeInstantiationExprHir, memberGep)
+		} else if arrayExprHir, ok := instantiation.ExprHir.(*hir.ArrayExprHir); ok {
+			memberGep := e.builder.CreateStructGEP(
+				structLlvmType,
+				ptrToStruct,
+				instantiation.MemberPosition,
+				fmt.Sprintf("%s::%s", typeInstantiationExprHir.TypeName, instantiation.MemberName),
+			)
+			value = e.emitForArrayExprHir(arrayExprHir, memberGep)
+		} else {
+			value = e.emitForExprHir(instantiation.ExprHir)
 		}
 
-		exprHir := e.emitForExprHir(instantiation.ExprHir)
-		args[instantiation.MemberPosition] = exprHir
+		args[instantiation.MemberPosition+1] = value
 	}
 
-	return e.builder.CreateCall(initFunction.GlobalValueType(), initFunction, args, "initcalltmp")
+	e.builder.CreateCall(initFunction.GlobalValueType(), initFunction, args, "")
+
+	if ptrCreated {
+		return e.builder.CreateLoad(structLlvmType, ptrToStruct, "loadtmp")
+	}
+
+	return ptrToStruct
 }
 
 func (e *Emitter) emitForMemberAccessExprHir(memberAccessExprHir *hir.MemberAccessExprHir, depth int) llvm.Value {
@@ -1220,30 +1250,51 @@ func (e *Emitter) emitForBinExprHir(binExprHir *hir.BinaryExprHir) llvm.Value {
 }
 
 func (e *Emitter) emitForArrayExprHir(arrayExprHir *hir.ArrayExprHir, ptrToArray llvm.Value) llvm.Value {
-	arrayType := arrayExprHir.ExprType().(*hir_types.ArrayType)
+	ptrCreated := false
+	arrayLlvmType := arrayExprHir.ExprType().(*hir_types.ArrayType)
 
 	if ptrToArray.IsNil() {
+		ptrCreated = true
 		currentBasicBlock := e.builder.GetInsertBlock()
 		e.builder.SetInsertPointAtEnd(e.currentAllocBasicBlock)
 		ptrToArray = e.builder.CreateAlloca(
-			e.getLlvmTypeForType(arrayType),
-			fmt.Sprintf("invisible_array_%s", arrayType.ItemType.Type()),
+			e.getLlvmTypeForType(arrayLlvmType),
+			fmt.Sprintf("invisible_array_%d_x_%s", arrayLlvmType.Size, arrayLlvmType.ItemType.Type()),
 		)
 		e.builder.SetInsertPointAtEnd(currentBasicBlock)
 	}
 
-	value := e.emitForExprHir(arrayExprHir.Elements[0])
-	e.builder.CreateStore(value, ptrToArray)
+	for i, exprHir := range arrayExprHir.Elements {
+		var arrayGep llvm.Value
+		if i == 0 {
+			arrayGep = ptrToArray
+		} else {
+			arrayGep = e.builder.CreateInBoundsGEP(
+				e.getLlvmTypeForType(arrayLlvmType.ItemType),
+				ptrToArray,
+				[]llvm.Value{llvm.ConstInt(e.typesMap["i32"], uint64(i), false)},
+				"arraygep",
+			)
+		}
 
-	for i, exprHir := range arrayExprHir.Elements[1:] {
-		arrayGep := e.builder.CreateInBoundsGEP(
-			e.getLlvmTypeForType(arrayType.ItemType),
-			ptrToArray,
-			[]llvm.Value{llvm.ConstInt(e.typesMap["i32"], uint64(i+1), false)},
-			"arraygep",
-		)
+		if typeInstantiationExprHir, ok := exprHir.(*hir.TypeInstantiationExprHir); ok {
+			e.emitForTypeInstantiationExprHir(typeInstantiationExprHir, arrayGep)
+			continue
+		} else if arrayExprHir, ok := exprHir.(*hir.ArrayExprHir); ok {
+			e.emitForArrayExprHir(arrayExprHir, arrayGep)
+			continue
+		}
+
 		value := e.emitForExprHir(exprHir)
 		e.builder.CreateStore(value, arrayGep)
+	}
+
+	if ptrCreated {
+		return e.builder.CreateLoad(
+			e.getLlvmTypeForType(arrayLlvmType),
+			ptrToArray,
+			"loadtmp",
+		)
 	}
 
 	return ptrToArray
