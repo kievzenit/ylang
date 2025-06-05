@@ -918,6 +918,8 @@ func (sa *SemanticAnalyzer) analyzeExpr(expr ast.Expr) hir.ExprHir {
 		return sa.analyzeArrayExpr(expr.(*ast.ArrayExpr))
 	case *ast.CallExpr:
 		return sa.analyzeCallExpr(expr.(*ast.CallExpr))
+	case *ast.ArraySubscriptExpr:
+		return sa.analyzeArraySubscriptExpr(expr.(*ast.ArraySubscriptExpr))
 	case *ast.IdentExpr:
 		return sa.analyzeIdentExpr(expr.(*ast.IdentExpr))
 	case *ast.IntExpr:
@@ -1539,6 +1541,49 @@ func (sa *SemanticAnalyzer) analyzeCallExpr(callExpr *ast.CallExpr) *hir.CallExp
 		Type: funcType.ReturnType,
 		Name: callExpr.Name,
 		Args: args,
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeArraySubscriptExpr(arraySubscriptExpr *ast.ArraySubscriptExpr) *hir.ArraySubscriptExprHir {
+	leftExpr := sa.analyzeExpr(arraySubscriptExpr.Left)
+	if hir.IsNilExpr(leftExpr) {
+		return nil
+	}
+
+	if _, ok := leftExpr.ExprType().(*types.ArrayType); !ok {
+		sa.eh.AddError(
+			newSemanticError(
+				"array subscript can only be applied to array types",
+				arraySubscriptExpr.StartToken.Metadata.FileName,
+				arraySubscriptExpr.StartToken.Metadata.Line,
+				arraySubscriptExpr.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	indexExpr := sa.analyzeExpr(arraySubscriptExpr.Index)
+	if hir.IsNilExpr(indexExpr) {
+		return nil
+	}
+
+	indexExpr = sa.tryImplicitCast(indexExpr, sa.typeResolver.IntType(32))
+	if !indexExpr.ExprType().SameAs(sa.typeResolver.IntType(32)) {
+		sa.eh.AddError(
+			newSemanticError(
+				"array subscript index must be of type i32",
+				arraySubscriptExpr.StartToken.Metadata.FileName,
+				arraySubscriptExpr.StartToken.Metadata.Line,
+				arraySubscriptExpr.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	return &hir.ArraySubscriptExprHir{
+		Type:  leftExpr.ExprType().(*types.ArrayType).ItemType,
+		Left:  leftExpr,
+		Index: indexExpr,
 	}
 }
 

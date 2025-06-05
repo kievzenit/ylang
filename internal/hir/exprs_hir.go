@@ -88,6 +88,12 @@ type CallExprHir struct {
 	Args []ExprHir
 }
 
+type ArraySubscriptExprHir struct {
+	types.Type
+	Left  ExprHir
+	Index ExprHir
+}
+
 type UnaryOp int
 
 const (
@@ -238,6 +244,7 @@ func (TypeInstantiationExprHir) ExprHirNode() {}
 func (MemberAccessExprHir) ExprHirNode()      {}
 func (ArrayExprHir) ExprHirNode()             {}
 func (CallExprHir) ExprHirNode()              {}
+func (ArraySubscriptExprHir) ExprHirNode()    {}
 func (PrefixExprHir) ExprHirNode()            {}
 func (PostfixExprHir) ExprHirNode()           {}
 func (OperatorCastExprHir) ExprHirNode()      {}
@@ -255,6 +262,7 @@ func (e TypeInstantiationExprHir) ExprType() types.Type { return e.Type }
 func (e MemberAccessExprHir) ExprType() types.Type      { return e.Type }
 func (e ArrayExprHir) ExprType() types.Type             { return e.Type }
 func (e CallExprHir) ExprType() types.Type              { return e.Type }
+func (e ArraySubscriptExprHir) ExprType() types.Type    { return e.Type }
 func (e PrefixExprHir) ExprType() types.Type            { return e.Type }
 func (e PostfixExprHir) ExprType() types.Type           { return e.Type }
 func (e OperatorCastExprHir) ExprType() types.Type      { return e.NewType }
@@ -270,8 +278,9 @@ func (ArgIdentExprHir) IsConst() bool          { return false }
 func (AssignExprHir) IsConst() bool            { return false }
 func (TypeInstantiationExprHir) IsConst() bool { return false }
 func (MemberAccessExprHir) IsConst() bool      { return false }
-func (ArrayExprHir) IsConst() bool             { return false }	
+func (ArrayExprHir) IsConst() bool             { return false }
 func (CallExprHir) IsConst() bool              { return false }
+func (ArraySubscriptExprHir) IsConst() bool    { return false }
 func (PrefixExprHir) IsConst() bool            { return false }
 func (PostfixExprHir) IsConst() bool           { return false }
 func (OperatorCastExprHir) IsConst() bool      { return false }
@@ -279,10 +288,11 @@ func (DownCastExprHir) IsConst() bool          { return false }
 func (UpCastExprHir) IsConst() bool            { return false }
 func (e BinaryExprHir) IsConst() bool          { return e.Left.IsConst() && e.Right.IsConst() }
 
-func (IdentExprHir) LvalueExprHirNode()        {}
-func (MemberAccessExprHir) LvalueExprHirNode() {}
-func (PrefixExprHir) LvalueExprHirNode()       {}
-func (PostfixExprHir) LvalueExprHirNode()      {}
+func (IdentExprHir) LvalueExprHirNode()          {}
+func (MemberAccessExprHir) LvalueExprHirNode()   {}
+func (ArraySubscriptExprHir) LvalueExprHirNode() {}
+func (PrefixExprHir) LvalueExprHirNode()         {}
+func (PostfixExprHir) LvalueExprHirNode()        {}
 
 func (OperatorCastExprHir) CastExprHirNode() {}
 func (DownCastExprHir) CastExprHirNode()     {}
