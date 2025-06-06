@@ -151,6 +151,8 @@
 
 <type_identifier> ::= <base_type_identifier>
     | "[" <integer_literal>? "]" <type_identifier>
+    | "*" <type_identifier>
+    | "const" <type_identifier>
 
 <base_type_identifier> ::= <identifier_literal>
     | <base_type_identifier> "::" <identifier_literal>
