@@ -36,14 +36,22 @@ func (f *FunctionType) SameAs(t Type) bool {
 	return false
 }
 
-func (FunctionType) GetMember(name string) (Type, bool) {
+func (f *FunctionType) IsConst() bool {
+	return true
+}
+
+func (*FunctionType) SetIsConst(bool) {
+	panic("cannot set is const for a function type")
+}
+
+func (*FunctionType) GetMember(name string) (Type, bool) {
 	return nil, false
 }
 
-func (FunctionType) CanBeImplicitlyCastedTo(t Type) bool {
+func (*FunctionType) CanBeImplicitlyCastedTo(t Type) bool {
 	return false
 }
 
-func (FunctionType) CanBeExplicitlyCastedTo(t Type) bool {
+func (*FunctionType) CanBeExplicitlyCastedTo(t Type) bool {
 	return false
 }

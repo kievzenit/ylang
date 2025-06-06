@@ -5,6 +5,7 @@ import "fmt"
 type IntType struct {
 	Signed bool
 	Bits   int
+	Const  bool
 }
 
 func (i *IntType) Type() string {
@@ -15,13 +16,26 @@ func (i *IntType) Type() string {
 }
 
 func (i *IntType) SameAs(t Type) bool {
+	if i.IsConst() != t.IsConst() {
+		return false
+	}
+
 	if intType, ok := t.(*IntType); ok {
 		return i.Signed == intType.Signed && i.Bits == intType.Bits
 	}
+
 	return false
 }
 
-func (IntType) GetMember(name string) (Type, bool) {
+func (i *IntType) IsConst() bool {
+	return i.Const
+}
+
+func (i *IntType) SetIsConst(isConst bool) {
+	i.Const = isConst
+}
+
+func (*IntType) GetMember(name string) (Type, bool) {
 	return nil, false
 }
 

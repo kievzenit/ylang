@@ -4,6 +4,7 @@ type UserType struct {
 	Name            string
 	Members         map[string]Type
 	MemberPositions map[string]int
+	Const           bool
 }
 
 func (t *UserType) Type() string {
@@ -11,6 +12,10 @@ func (t *UserType) Type() string {
 }
 
 func (t *UserType) SameAs(other Type) bool {
+	if t.IsConst() != other.IsConst() {
+		return false
+	}
+
 	if userType, ok := other.(*UserType); ok {
 		if t.Name != userType.Name {
 			return false
@@ -26,6 +31,14 @@ func (t *UserType) SameAs(other Type) bool {
 		return true
 	}
 	return false
+}
+
+func (t *UserType) IsConst() bool {
+	return t.Const
+}
+
+func (t *UserType) SetIsConst(isConst bool) {
+	t.Const = isConst
 }
 
 func (t *UserType) GetMember(name string) (Type, bool) {

@@ -1,23 +1,38 @@
 package hir_types
 
-type BoolType struct{}
+type BoolType struct{
+	Const bool
+}
 
-func (BoolType) Type() string {
+func (*BoolType) Type() string {
 	return "bool"
 }
 
-func (BoolType) SameAs(t Type) bool {
-	if _, ok := t.(*BoolType); ok {
+func (t *BoolType) SameAs(other Type) bool {
+	if t.IsConst() != t.IsConst() {
+		return false
+	}
+
+	if _, ok := other.(*BoolType); ok {
 		return true
 	}
+
 	return false
 }
 
-func (BoolType) GetMember(name string) (Type, bool) {
+func (b *BoolType) IsConst() bool {
+	return b.Const
+}
+
+func (b *BoolType) SetIsConst(isConst bool) {
+	b.Const = isConst
+}
+
+func (*BoolType) GetMember(name string) (Type, bool) {
 	return nil, false
 }
 
-func (BoolType) CanBeImplicitlyCastedTo(t Type) bool {
+func (*BoolType) CanBeImplicitlyCastedTo(t Type) bool {
 	intType, ok := t.(*IntType)
 	if ok {
 		return intType.Bits == 1
@@ -26,7 +41,7 @@ func (BoolType) CanBeImplicitlyCastedTo(t Type) bool {
 	return false
 }
 
-func (BoolType) CanBeExplicitlyCastedTo(t Type) bool {
+func (*BoolType) CanBeExplicitlyCastedTo(t Type) bool {
 	_, ok := t.(*IntType)
 	return ok
 }
