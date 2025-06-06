@@ -826,7 +826,7 @@ func (p *Parser) parseExprStmt(expectSemicolon bool) ast.Stmt {
 	}
 }
 
-func (p *Parser) parseBaseTypeIdentifier() *ast.IdentTypeNode {
+func (p *Parser) parseBaseTypeIdentifier(isConst bool) *ast.IdentTypeNode {
 	var typeName string
 
 	p.expect(lexer.IDENT)
@@ -844,16 +844,17 @@ func (p *Parser) parseBaseTypeIdentifier() *ast.IdentTypeNode {
 	// }
 
 	return &ast.IdentTypeNode{
-		Name: typeName,
+		Name:  typeName,
+		Const: isConst,
 	}
 }
 
-func (p *Parser) parseTypeIdentifier() ast.TypeNode {
+func (p *Parser) parseTypeIdentifierInner(isCurrConst bool) ast.TypeNode {
 	p.expectAny(lexer.IDENT, lexer.LBRACKET, lexer.ASTERISK)
 
 	switch p.curr.Kind {
 	case lexer.IDENT:
-		return p.parseBaseTypeIdentifier()
+		return p.parseBaseTypeIdentifier(isCurrConst)
 	case lexer.LBRACKET:
 		p.read()
 
@@ -861,6 +862,7 @@ func (p *Parser) parseTypeIdentifier() ast.TypeNode {
 			p.read()
 			return &ast.SliceTypeNode{
 				InnerType: p.parseTypeIdentifier(),
+				Const:     isCurrConst,
 			}
 		}
 
@@ -874,16 +876,28 @@ func (p *Parser) parseTypeIdentifier() ast.TypeNode {
 		return &ast.ArrayTypeNode{
 			Size:      size,
 			InnerType: p.parseTypeIdentifier(),
+			Const:     isCurrConst,
 		}
 	case lexer.ASTERISK:
 		p.read()
 
 		return &ast.PointerTypeNode{
 			InnerType: p.parseTypeIdentifier(),
+			Const:     isCurrConst,
 		}
 	default:
 		panic("unreachable")
 	}
+}
+
+func (p *Parser) parseTypeIdentifier() ast.TypeNode {
+	isInnerConst := false
+	if p.curr.Kind == lexer.CONST {
+		isInnerConst = true
+		p.read()
+	}
+
+	return p.parseTypeIdentifierInner(isInnerConst)
 }
 
 func (p *Parser) parseExpr() ast.Expr {
@@ -1115,7 +1129,7 @@ func (p *Parser) parseArrayExpression() ast.Expr {
 
 func (p *Parser) parseTypeExpr() ast.Expr {
 	startToken := p.curr
-	typeName := p.parseBaseTypeIdentifier()
+	typeName := p.parseBaseTypeIdentifier(false)
 
 	p.expectAny(lexer.TYPE_INIT, lexer.TYPE_CONSTRUCT)
 	switch p.curr.Kind {
