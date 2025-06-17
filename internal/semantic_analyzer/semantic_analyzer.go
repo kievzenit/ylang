@@ -798,7 +798,7 @@ func (sa *SemanticAnalyzer) analyzeBreakAllStmt(breakAllStmt *ast.BreakAllStmt) 
 }
 
 func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hir.VarDeclStmtHir {
-	varDef, defined := sa.scope.lookupVar(varDeclStmt.Name)
+	_, defined := sa.scope.lookupVar(varDeclStmt.Name)
 	if defined {
 		sa.eh.AddError(
 			newSemanticError(
@@ -887,7 +887,7 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 	})
 
 	return &hir.VarDeclStmtHir{
-		Type:  varDef.Type,
+		Type:  valueExpr.ExprType(),
 		Name:  varDeclStmt.Name,
 		Value: valueExpr,
 	}
@@ -937,6 +937,10 @@ func (sa *SemanticAnalyzer) analyzeExpr(expr ast.Expr) hir.ExprHir {
 
 func (sa *SemanticAnalyzer) tryImplicitCast(exprHir hir.ExprHir, hirType types.Type) hir.ExprHir {
 	if exprHir.ExprType().SameAs(hirType) {
+		return exprHir
+	}
+
+	if exprHir.ExprType().IsConst() && !hirType.IsConst() {
 		return exprHir
 	}
 
@@ -1028,6 +1032,21 @@ func (sa *SemanticAnalyzer) analyzeAssignExpr(assignExpr *ast.AssignExpr) *hir.A
 	right := sa.analyzeExpr(assignExpr.Right)
 	if hir.IsNilExpr(right) {
 		return nil
+	}
+
+	if identExprHir, ok := left.(*hir.IdentExprHir); ok {
+		varDef, defined := sa.scope.lookupVar(identExprHir.Name)
+		if defined && varDef.Const {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("cannot assign to const variable %s", identExprHir.Name),
+					assignExpr.Op.Metadata.FileName,
+					assignExpr.Op.Metadata.Line,
+					assignExpr.Op.Metadata.Column,
+				),
+			)
+			return nil
+		}
 	}
 
 	right = sa.tryImplicitCast(right, left.ExprType())
