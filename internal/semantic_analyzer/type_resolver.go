@@ -8,9 +8,10 @@ import (
 )
 
 type TypeResolver struct {
-	builtinTypesMap map[string]types.Type
-	customTypesMap  map[string]types.Type
-	userTypesMap    map[string]*types.UserType
+	builtinTypesMap         map[string]types.Type
+	customTypesMap          map[string]types.Type
+	userTypesMap            map[string]*types.UserType
+	forwardDeclaredTypesMap map[string]*ast.TypeDeclStmt
 }
 
 func (tr *TypeResolver) defineBuiltInTypes() {
@@ -82,9 +83,10 @@ func (tr *TypeResolver) defineBuiltInTypes() {
 
 func NewTypeResolver() *TypeResolver {
 	tr := &TypeResolver{
-		builtinTypesMap: make(map[string]types.Type),
-		customTypesMap:  make(map[string]types.Type),
-		userTypesMap:    make(map[string]*types.UserType),
+		builtinTypesMap:         make(map[string]types.Type),
+		customTypesMap:          make(map[string]types.Type),
+		userTypesMap:            make(map[string]*types.UserType),
+		forwardDeclaredTypesMap: make(map[string]*ast.TypeDeclStmt),
 	}
 	tr.defineBuiltInTypes()
 	return tr
