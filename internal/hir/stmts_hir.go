@@ -20,7 +20,7 @@ type ScopeStmtHir struct {
 }
 
 type FuncDeclStmtHir struct {
-	types.FunctionType
+	*types.FunctionType
 	Body *ScopeStmtHir
 }
 
