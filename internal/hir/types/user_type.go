@@ -4,6 +4,7 @@ type UserType struct {
 	Name            string
 	Members         map[string]Type
 	MemberPositions map[string]int
+	MemberFunctions map[string]*FunctionType
 	Const           bool
 }
 
