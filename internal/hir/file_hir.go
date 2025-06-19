@@ -5,7 +5,7 @@ import (
 )
 
 type FileHir struct {
-	FuncPrototypes []types.FunctionType
+	FuncPrototypes []*types.FunctionType
 	Types          map[string]*types.UserType
 	Stmts          []TopStmtHir
 }
