@@ -87,7 +87,7 @@ type SemanticAnalyzer struct {
 
 	typeResolver *TypeResolver
 
-	funcsMap map[string]types.FunctionType
+	funcsMap map[string]*types.FunctionType
 
 	loopDepth int
 }
@@ -114,7 +114,7 @@ func NewSemanticAnalyzer(
 		scope:    &scope{variables: make(map[string]varDefinition)},
 		funcArgs: make(map[string]argDefinition),
 
-		funcsMap: make(map[string]types.FunctionType),
+		funcsMap: make(map[string]*types.FunctionType),
 
 		typeResolver: NewTypeResolver(),
 
@@ -136,10 +136,14 @@ func (sa *SemanticAnalyzer) Analyze() *hir.FileHir {
 	sa.scanTranslationUnitForFuncDeclStmts()
 
 	topStmts := sa.analyzeTranslationUnit(sa.translationUnit)
-	funcTypes := make([]types.FunctionType, 0)
+	memberFuncs := sa.analyzeMemberFunctions()
+	topStmts = append(topStmts, memberFuncs...)
+
+	funcTypes := make([]*types.FunctionType, 0)
 	for _, funcType := range sa.funcsMap {
 		funcTypes = append(funcTypes, funcType)
 	}
+
 	return &hir.FileHir{
 		FuncPrototypes: funcTypes,
 		Types:          sa.typeResolver.GetUserTypes(),
@@ -185,8 +189,14 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForTypeDeclStmts() {
 		sa.forwardTypeDeclarations[typeDeclStmt.Name] = typeDeclStmt
 	}
 
+	userTypes := make([]*types.UserType, 0)
 	for _, typeDeclStmt := range sa.forwardTypeDeclarations {
-		sa.analyzeTypeDeclStmt(typeDeclStmt)
+		userType := sa.analyzeTypeDeclStmt(typeDeclStmt)
+		userTypes = append(userTypes, userType)
+	}
+
+	for _, userType := range userTypes {
+		sa.declareMemberFunctions(sa.forwardTypeDeclarations[userType.Name], userType)
 	}
 }
 
@@ -197,59 +207,76 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFuncDeclStmts() {
 			continue
 		}
 
-		returnType, ok := sa.typeResolver.GetType(funcDeclStmt.ReturnType)
+		funcType, ok := sa.checkFunc(funcDeclStmt)
+
+		if ok {
+			sa.funcsMap[funcDeclStmt.Name] = funcType
+		}
+	}
+}
+
+func (sa *SemanticAnalyzer) checkFunc(funcDeclStmt *ast.FuncDeclStmt) (*types.FunctionType, bool) {
+	failed := false
+
+	returnType, ok := sa.typeResolver.GetType(funcDeclStmt.ReturnType)
+	if !ok {
+		sa.eh.AddError(
+			newSemanticError(
+				fmt.Sprintf("return type %s not defined", funcDeclStmt.ReturnType.TypeName()),
+				funcDeclStmt.StartToken.Metadata.FileName,
+				funcDeclStmt.StartToken.Metadata.Line,
+				funcDeclStmt.StartToken.Metadata.Column,
+			),
+		)
+		failed = true
+	}
+
+	args := make([]types.FunctionArgType, 0)
+	for _, arg := range funcDeclStmt.Args {
+		argType, ok := sa.typeResolver.GetType(arg.Type)
 		if !ok {
 			sa.eh.AddError(
 				newSemanticError(
-					fmt.Sprintf("return type %s not defined", funcDeclStmt.ReturnType.TypeName()),
+					fmt.Sprintf("argument type %s not defined", arg.Type),
 					funcDeclStmt.StartToken.Metadata.FileName,
 					funcDeclStmt.StartToken.Metadata.Line,
 					funcDeclStmt.StartToken.Metadata.Column,
 				),
 			)
+			failed = true
 		}
 
-		args := make([]types.FunctionArgType, 0)
-		for _, arg := range funcDeclStmt.Args {
-			argType, ok := sa.typeResolver.GetType(arg.Type)
-			if !ok {
-				sa.eh.AddError(
-					newSemanticError(
-						fmt.Sprintf("argument type %s not defined", arg.Type),
-						funcDeclStmt.StartToken.Metadata.FileName,
-						funcDeclStmt.StartToken.Metadata.Line,
-						funcDeclStmt.StartToken.Metadata.Column,
-					),
-				)
-			}
-
-			if argType.SameAs(sa.typeResolver.VoidType()) {
-				sa.eh.AddError(
-					newSemanticError(
-						"argument cannot be of type void",
-						funcDeclStmt.StartToken.Metadata.FileName,
-						funcDeclStmt.StartToken.Metadata.Line,
-						funcDeclStmt.StartToken.Metadata.Column,
-					),
-				)
-			}
-
-			args = append(args, types.FunctionArgType{
-				Name: arg.Name,
-				Type: argType,
-			})
+		if argType.SameAs(sa.typeResolver.VoidType()) {
+			sa.eh.AddError(
+				newSemanticError(
+					"argument cannot be of type void",
+					funcDeclStmt.StartToken.Metadata.FileName,
+					funcDeclStmt.StartToken.Metadata.Line,
+					funcDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			failed = true
 		}
 
-		sa.funcsMap[funcDeclStmt.Name] = types.FunctionType{
-			Name:       funcDeclStmt.Name,
-			Args:       args,
-			ReturnType: returnType,
-			Extern:     funcDeclStmt.Extern,
-		}
+		args = append(args, types.FunctionArgType{
+			Name: arg.Name,
+			Type: argType,
+		})
 	}
+
+	if failed {
+		return nil, false
+	}
+
+	return &types.FunctionType{
+		Name:       funcDeclStmt.Name,
+		Args:       args,
+		ReturnType: returnType,
+		Extern:     funcDeclStmt.Extern,
+	}, true
 }
 
-func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) types.Type {
+func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) *types.UserType {
 	if userType, ok := sa.typeResolver.GetUserType(typeDeclStmt.Name); ok {
 		return userType
 	}
@@ -314,10 +341,92 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 		Name:            typeDeclStmt.Name,
 		Members:         members,
 		MemberPositions: memberPositions,
+		MemberFunctions: make(map[string]*types.FunctionType),
 	}
 	sa.typeResolver.AddUserType(userType.Name, userType)
 	delete(sa.currentlyProcessingTypes, typeDeclStmt.Name)
 	return userType
+}
+
+func (sa *SemanticAnalyzer) declareMemberFunctions(
+	typeDeclStmt *ast.TypeDeclStmt,
+	userType *types.UserType,
+) {
+	for _, function := range typeDeclStmt.Funcs {
+		if len(function.Args) == 0 {
+			sa.eh.AddError(
+				newSemanticError(
+					"member function must have at least one argument (self)",
+					function.StartToken.Metadata.FileName,
+					function.StartToken.Metadata.Line,
+					function.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		}
+
+		firstArg := function.Args[0]
+		if firstArg.Name != "self" {
+			sa.eh.AddError(
+				newSemanticError(
+					"first argument of member function must be named (self)",
+					function.StartToken.Metadata.FileName,
+					function.StartToken.Metadata.Line,
+					function.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		}
+
+		argType, ok := firstArg.Type.(*ast.PointerTypeNode)
+		if !ok {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("first argument of member function must be a pointer to type %s", userType.Name),
+					function.StartToken.Metadata.FileName,
+					function.StartToken.Metadata.Line,
+					function.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		}
+
+		if argType.InnerType.TypeName() != userType.Name {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("first argument of member function must be a pointer to type %s", userType.Name),
+					function.StartToken.Metadata.FileName,
+					function.StartToken.Metadata.Line,
+					function.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		}
+
+		funcType, ok := sa.checkFunc(function.FuncDeclStmt)
+		if ok {
+			memberFuncName := fmt.Sprintf("%s::%s", userType.Name, function.FuncDeclStmt.Name)
+			sa.funcsMap[memberFuncName] = funcType
+			userType.MemberFunctions[function.FuncDeclStmt.Name] = funcType
+		}
+	}
+}
+
+func (sa *SemanticAnalyzer) analyzeMemberFunctions() []hir.TopStmtHir {
+	memberFuncsHir := make([]hir.TopStmtHir, 0)
+
+	for _, typeDeclStmt := range sa.forwardTypeDeclarations {
+		for _, function := range typeDeclStmt.Funcs {
+			memberFuncDeclStmtHir := sa.analyzeFuncDeclStmt(function.FuncDeclStmt, typeDeclStmt.Name)
+			if memberFuncDeclStmtHir == nil {
+				continue
+			}
+			memberFuncDeclStmtHir.Name = fmt.Sprintf("%s::%s", typeDeclStmt.Name, memberFuncDeclStmtHir.Name)
+			memberFuncsHir = append(memberFuncsHir, memberFuncDeclStmtHir)
+		}
+	}
+
+	return memberFuncsHir
 }
 
 func (sa *SemanticAnalyzer) analyzeTranslationUnit(translationUnit ast.TranslationUnit) []hir.TopStmtHir {
@@ -337,7 +446,7 @@ func (sa *SemanticAnalyzer) analyzeTranslationUnit(translationUnit ast.Translati
 func (sa *SemanticAnalyzer) analyzeTopStmt(topStmt ast.TopStmt) hir.TopStmtHir {
 	switch topStmt.(type) {
 	case *ast.FuncDeclStmt:
-		return sa.analyzeFuncDeclStmt(topStmt.(*ast.FuncDeclStmt))
+		return sa.analyzeFuncDeclStmt(topStmt.(*ast.FuncDeclStmt), "")
 	case *ast.VarDeclStmt:
 		return sa.analyzeVarDeclStmt(topStmt.(*ast.VarDeclStmt))
 	case *ast.TypeDeclStmt:
@@ -347,9 +456,14 @@ func (sa *SemanticAnalyzer) analyzeTopStmt(topStmt ast.TopStmt) hir.TopStmtHir {
 	}
 }
 
-func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt) *hir.FuncDeclStmtHir {
+func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt, typeName string) *hir.FuncDeclStmtHir {
 	sa.enterScope()
 	defer sa.exitScope()
+
+	fullFuncName := funcDeclStmt.Name
+	if typeName != "" {
+		fullFuncName = fmt.Sprintf("%s::%s", typeName, funcDeclStmt.Name)
+	}
 
 	if funcDeclStmt.Extern {
 		if funcDeclStmt.Body != nil {
@@ -364,12 +478,12 @@ func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt) 
 			return nil
 		}
 		return &hir.FuncDeclStmtHir{
-			FunctionType: sa.funcsMap[funcDeclStmt.Name],
+			FunctionType: sa.funcsMap[fullFuncName],
 			Body:         nil,
 		}
 	}
 
-	functionType := sa.funcsMap[funcDeclStmt.Name]
+	functionType := sa.funcsMap[fullFuncName]
 	sa.funcRetType = functionType.ReturnType
 	for i, arg := range functionType.Args {
 		sa.funcArgs[arg.Name] = argDefinition{
@@ -1438,7 +1552,7 @@ func (sa *SemanticAnalyzer) analyzeTypeInstantiationExpr(typeInstantiationExpr *
 	}
 }
 
-func (sa *SemanticAnalyzer) analyzeMemberAccessExpr(memberAccessExpr *ast.MemberAccessExpr) *hir.MemberAccessExprHir {
+func (sa *SemanticAnalyzer) analyzeMemberAccessExpr(memberAccessExpr *ast.MemberAccessExpr) hir.ExprHir {
 	left := sa.analyzeExpr(memberAccessExpr.Left)
 	if hir.IsNilExpr(left) {
 		return nil
@@ -1449,15 +1563,21 @@ func (sa *SemanticAnalyzer) analyzeMemberAccessExpr(memberAccessExpr *ast.Member
 		right := memberAccessExpr.Right.(*ast.IdentExpr)
 		memberType, ok := left.ExprType().GetMember(right.Value)
 		if !ok {
-			sa.eh.AddError(
-				newSemanticError(
-					fmt.Sprintf("member %s not found in type %s", right.Value, left.ExprType().Type()),
-					memberAccessExpr.StartToken.Metadata.FileName,
-					memberAccessExpr.StartToken.Metadata.Line,
-					memberAccessExpr.StartToken.Metadata.Column,
-				),
-			)
-			return nil
+			if leftPtrType, isPtr := left.ExprType().(*types.PointerType); isPtr {
+				memberType, ok = leftPtrType.InnerType.GetMember(right.Value)
+			}
+
+			if !ok {
+				sa.eh.AddError(
+					newSemanticError(
+						fmt.Sprintf("member %s not found in type %s", right.Value, left.ExprType().Type()),
+						memberAccessExpr.StartToken.Metadata.FileName,
+						memberAccessExpr.StartToken.Metadata.Line,
+						memberAccessExpr.StartToken.Metadata.Column,
+					),
+				)
+				return nil
+			}
 		}
 
 		return &hir.MemberAccessExprHir{
