@@ -135,9 +135,11 @@ func (sa *SemanticAnalyzer) Analyze() *hir.FileHir {
 	sa.scanTranslationUnitForTypeDeclStmts()
 	sa.scanTranslationUnitForFuncDeclStmts()
 
-	topStmts := sa.analyzeTranslationUnit(sa.translationUnit)
+	globalVars := sa.analyzeGlobalVars()
+
+	funcs := sa.analyzeFunctions()
 	memberFuncs := sa.analyzeMemberFunctions()
-	topStmts = append(topStmts, memberFuncs...)
+	funcs = append(funcs, memberFuncs...)
 
 	funcTypes := make([]*types.FunctionType, 0)
 	for _, funcType := range sa.funcsMap {
@@ -147,7 +149,9 @@ func (sa *SemanticAnalyzer) Analyze() *hir.FileHir {
 	return &hir.FileHir{
 		FuncPrototypes: funcTypes,
 		Types:          sa.typeResolver.GetUserTypes(),
-		Stmts:          topStmts,
+
+		GlobalVarDecls: globalVars,
+		FuncDecls:      funcs,
 	}
 }
 
@@ -412,8 +416,20 @@ func (sa *SemanticAnalyzer) declareMemberFunctions(
 	}
 }
 
-func (sa *SemanticAnalyzer) analyzeMemberFunctions() []hir.TopStmtHir {
-	memberFuncsHir := make([]hir.TopStmtHir, 0)
+func (sa *SemanticAnalyzer) analyzeGlobalVars() []*hir.VarDeclStmtHir {
+	globalVarsHir := make([]*hir.VarDeclStmtHir, 0)
+
+	for _, globalVarDecl := range sa.translationUnit.Stmts {
+		if varDeclStmt, ok := globalVarDecl.(*ast.VarDeclStmt); ok {
+			globalVarsHir = append(globalVarsHir, sa.analyzeVarDeclStmt(varDeclStmt, true))
+		}
+	}
+
+	return globalVarsHir
+}
+
+func (sa *SemanticAnalyzer) analyzeMemberFunctions() []*hir.FuncDeclStmtHir {
+	memberFuncsHir := make([]*hir.FuncDeclStmtHir, 0)
 
 	for _, typeDeclStmt := range sa.forwardTypeDeclarations {
 		for _, function := range typeDeclStmt.Funcs {
@@ -429,31 +445,16 @@ func (sa *SemanticAnalyzer) analyzeMemberFunctions() []hir.TopStmtHir {
 	return memberFuncsHir
 }
 
-func (sa *SemanticAnalyzer) analyzeTranslationUnit(translationUnit ast.TranslationUnit) []hir.TopStmtHir {
-	topStmts := make([]hir.TopStmtHir, 0)
-	for _, topStmt := range translationUnit.Stmts {
-		topStmtHir := sa.analyzeTopStmt(topStmt)
-		if topStmtHir == nil {
-			continue
+func (sa *SemanticAnalyzer) analyzeFunctions() []*hir.FuncDeclStmtHir {
+	funcsHir := make([]*hir.FuncDeclStmtHir, 0)
+
+	for _, stmt := range sa.translationUnit.Stmts {
+		if funcDeclStmt, ok := stmt.(*ast.FuncDeclStmt); ok {
+			funcsHir = append(funcsHir, sa.analyzeFuncDeclStmt(funcDeclStmt, ""))
 		}
-
-		topStmts = append(topStmts, topStmtHir)
 	}
 
-	return topStmts
-}
-
-func (sa *SemanticAnalyzer) analyzeTopStmt(topStmt ast.TopStmt) hir.TopStmtHir {
-	switch topStmt.(type) {
-	case *ast.FuncDeclStmt:
-		return sa.analyzeFuncDeclStmt(topStmt.(*ast.FuncDeclStmt), "")
-	case *ast.VarDeclStmt:
-		return sa.analyzeVarDeclStmt(topStmt.(*ast.VarDeclStmt))
-	case *ast.TypeDeclStmt:
-		return nil
-	default:
-		panic("not implemented")
-	}
+	return funcsHir
 }
 
 func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt, typeName string) *hir.FuncDeclStmtHir {
@@ -911,7 +912,7 @@ func (sa *SemanticAnalyzer) analyzeBreakAllStmt(breakAllStmt *ast.BreakAllStmt) 
 	return &hir.BreakAllStmtHir{}
 }
 
-func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hir.VarDeclStmtHir {
+func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt, isGlobal bool) *hir.VarDeclStmtHir {
 	_, defined := sa.scope.lookupVar(varDeclStmt.Name)
 	if defined {
 		sa.eh.AddError(
@@ -929,6 +930,30 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt) *hi
 		sa.eh.AddError(
 			newSemanticError(
 				fmt.Sprintf("variable %s shadows function argument", varDeclStmt.Name),
+				varDeclStmt.StartToken.Metadata.FileName,
+				varDeclStmt.StartToken.Metadata.Line,
+				varDeclStmt.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	if isGlobal && !varDeclStmt.Value.IsConst() {
+		sa.eh.AddError(
+			newSemanticError(
+				"global variable can only be initialized with a constant expression",
+				varDeclStmt.StartToken.Metadata.FileName,
+				varDeclStmt.StartToken.Metadata.Line,
+				varDeclStmt.StartToken.Metadata.Column,
+			),
+		)
+		return nil
+	}
+
+	if isGlobal && varDeclStmt.Static {
+		sa.eh.AddError(
+			newSemanticError(
+				"global variable cannot be static",
 				varDeclStmt.StartToken.Metadata.FileName,
 				varDeclStmt.StartToken.Metadata.Line,
 				varDeclStmt.StartToken.Metadata.Column,
