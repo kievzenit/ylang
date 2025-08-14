@@ -209,6 +209,8 @@ func (p *Parser) parseTopSmt() ast.TopStmt {
 		startToken := p.curr
 		p.read()
 		return p.parseVarDeclStmt(true, startToken, true)
+	case lexer.LET, lexer.CONST:
+		return p.parseVarDeclStmt(false, nil, true)
 	}
 
 	p.eh.AddError(&UnexpectedError{
