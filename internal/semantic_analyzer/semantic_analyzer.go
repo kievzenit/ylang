@@ -323,7 +323,7 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 
 		if _, ok := sa.currentlyProcessingTypes[member.Type.TypeName()]; ok {
 			for typeName := range sa.currentlyProcessingTypes {
-				typeDeclStmt, _ := sa.forwardTypeDeclarations[typeName]
+				typeDeclStmt := sa.forwardTypeDeclarations[typeName]
 				sa.eh.AddError(
 					newSemanticError(
 						fmt.Sprintf("type %s is recursively defined", typeDeclStmt.Name),
@@ -536,31 +536,31 @@ func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt, 
 }
 
 func (sa *SemanticAnalyzer) analyzeStmt(stmt ast.Stmt) hir.StmtHir {
-	switch stmt.(type) {
+	switch stmt := stmt.(type) {
 	case *ast.ScopeStmt:
-		return sa.analyzeScopeStmt(stmt.(*ast.ScopeStmt))
+		return sa.analyzeScopeStmt(stmt)
 	case *ast.IfStmt:
-		return sa.analyzeIfStmt(stmt.(*ast.IfStmt))
+		return sa.analyzeIfStmt(stmt)
 	case *ast.WhileStmt:
-		return sa.analyzeWhileStmt(stmt.(*ast.WhileStmt))
+		return sa.analyzeWhileStmt(stmt)
 	case *ast.DoWhileStmt:
-		return sa.analyzeDoWhileStmt(stmt.(*ast.DoWhileStmt))
+		return sa.analyzeDoWhileStmt(stmt)
 	case *ast.LoopStmt:
-		return sa.analyzeLoopStmt(stmt.(*ast.LoopStmt))
+		return sa.analyzeLoopStmt(stmt)
 	case *ast.ForStmt:
-		return sa.analyzeForStmt(stmt.(*ast.ForStmt))
+		return sa.analyzeForStmt(stmt)
 	case *ast.ReturnStmt:
-		return sa.analyzeReturnStmt(stmt.(*ast.ReturnStmt))
+		return sa.analyzeReturnStmt(stmt)
 	case *ast.ContinueStmt:
-		return sa.analyzeContinueStmt(stmt.(*ast.ContinueStmt))
+		return sa.analyzeContinueStmt(stmt)
 	case *ast.BreakStmt:
-		return sa.analyzeBreakStmt(stmt.(*ast.BreakStmt))
+		return sa.analyzeBreakStmt(stmt)
 	case *ast.BreakAllStmt:
-		return sa.analyzeBreakAllStmt(stmt.(*ast.BreakAllStmt))
+		return sa.analyzeBreakAllStmt(stmt)
 	case *ast.VarDeclStmt:
-		return sa.analyzeVarDeclStmt(stmt.(*ast.VarDeclStmt))
+		return sa.analyzeVarDeclStmt(stmt, false)
 	case *ast.ExprStmt:
-		return sa.analyzeExprStmt(stmt.(*ast.ExprStmt))
+		return sa.analyzeExprStmt(stmt)
 	default:
 		panic("not implemented")
 	}
@@ -1040,35 +1040,35 @@ func (sa *SemanticAnalyzer) analyzeExprStmt(exprStmt *ast.ExprStmt) *hir.ExprStm
 }
 
 func (sa *SemanticAnalyzer) analyzeExpr(expr ast.Expr) hir.ExprHir {
-	switch expr.(type) {
+	switch expr := expr.(type) {
 	case *ast.BinaryExpr:
-		return sa.analyzeBinaryExpr(expr.(*ast.BinaryExpr))
+		return sa.analyzeBinaryExpr(expr)
 	case *ast.AssignExpr:
-		return sa.analyzeAssignExpr(expr.(*ast.AssignExpr))
+		return sa.analyzeAssignExpr(expr)
 	case *ast.PrefixExpr:
-		return sa.analyzePrefixExpr(expr.(*ast.PrefixExpr))
+		return sa.analyzePrefixExpr(expr)
 	case *ast.PostfixExpr:
-		return sa.analyzePostfixExpr(expr.(*ast.PostfixExpr))
+		return sa.analyzePostfixExpr(expr)
 	case *ast.TypeInstantiationExpr:
-		return sa.analyzeTypeInstantiationExpr(expr.(*ast.TypeInstantiationExpr))
+		return sa.analyzeTypeInstantiationExpr(expr)
 	case *ast.MemberAccessExpr:
-		return sa.analyzeMemberAccessExpr(expr.(*ast.MemberAccessExpr))
+		return sa.analyzeMemberAccessExpr(expr)
 	case *ast.ArrayExpr:
-		return sa.analyzeArrayExpr(expr.(*ast.ArrayExpr))
+		return sa.analyzeArrayExpr(expr)
 	case *ast.CallExpr:
-		return sa.analyzeCallExpr(expr.(*ast.CallExpr))
+		return sa.analyzeCallExpr(expr)
 	case *ast.ArraySubscriptExpr:
-		return sa.analyzeArraySubscriptExpr(expr.(*ast.ArraySubscriptExpr))
+		return sa.analyzeArraySubscriptExpr(expr)
 	case *ast.IdentExpr:
-		return sa.analyzeIdentExpr(expr.(*ast.IdentExpr))
+		return sa.analyzeIdentExpr(expr)
 	case *ast.IntExpr:
-		return sa.analyzeIntExpr(expr.(*ast.IntExpr))
+		return sa.analyzeIntExpr(expr)
 	case *ast.FloatExpr:
-		return sa.analyzeFloatExpr(expr.(*ast.FloatExpr))
+		return sa.analyzeFloatExpr(expr)
 	case *ast.BoolExpr:
-		return sa.analyzeBoolExpr(expr.(*ast.BoolExpr))
+		return sa.analyzeBoolExpr(expr)
 	case *ast.CastExpr:
-		return sa.analyzeCastExpr(expr.(*ast.CastExpr))
+		return sa.analyzeCastExpr(expr)
 	default:
 		panic("not implemented")
 	}
