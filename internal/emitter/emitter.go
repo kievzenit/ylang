@@ -212,31 +212,31 @@ func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 }
 
 func (e *Emitter) emitForStmtHir(stmtHir hir.StmtHir) {
-	switch stmtHir.(type) {
+	switch stmtHir := stmtHir.(type) {
 	case *hir.ScopeStmtHir:
-		e.emitForScopeStmtHir(stmtHir.(*hir.ScopeStmtHir))
+		e.emitForScopeStmtHir(stmtHir)
 	case *hir.VarDeclStmtHir:
-		e.emitForVarDeclStmtHir(stmtHir.(*hir.VarDeclStmtHir))
+		e.emitForVarDeclStmtHir(stmtHir)
 	case *hir.IfStmtHir:
-		e.emitForIfStmtHir(stmtHir.(*hir.IfStmtHir))
+		e.emitForIfStmtHir(stmtHir)
 	case *hir.WhileStmtHir:
-		e.emitForWhileStmtHir(stmtHir.(*hir.WhileStmtHir))
+		e.emitForWhileStmtHir(stmtHir)
 	case *hir.DoWhileStmtHir:
-		e.emitForDoWhileStmtHir(stmtHir.(*hir.DoWhileStmtHir))
+		e.emitForDoWhileStmtHir(stmtHir)
 	case *hir.LoopStmtHir:
-		e.emitForLoopStmtHir(stmtHir.(*hir.LoopStmtHir))
+		e.emitForLoopStmtHir(stmtHir)
 	case *hir.ForStmtHir:
-		e.emitForForStmtHir(stmtHir.(*hir.ForStmtHir))
+		e.emitForForStmtHir(stmtHir)
 	case *hir.ReturnStmtHir:
-		e.emitForReturnStmtHir(stmtHir.(*hir.ReturnStmtHir))
+		e.emitForReturnStmtHir(stmtHir)
 	case *hir.ContinueStmtHir:
-		e.emitForContinueStmtHir(stmtHir.(*hir.ContinueStmtHir))
+		e.emitForContinueStmtHir(stmtHir)
 	case *hir.BreakStmtHir:
-		e.emitForBreakStmtHir(stmtHir.(*hir.BreakStmtHir))
+		e.emitForBreakStmtHir(stmtHir)
 	case *hir.BreakAllStmtHir:
-		e.emitForBreakAllStmtHir(stmtHir.(*hir.BreakAllStmtHir))
+		e.emitForBreakAllStmtHir(stmtHir)
 	case *hir.ExprStmtHir:
-		e.emitForExprStmtHir(stmtHir.(*hir.ExprStmtHir))
+		e.emitForExprStmtHir(stmtHir)
 	default:
 		panic("not implemented")
 	}
@@ -505,39 +505,39 @@ func (e *Emitter) emitForExprStmtHir(expStmtHir *hir.ExprStmtHir) {
 }
 
 func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
-	switch exprHir.(type) {
+	switch exprHir := exprHir.(type) {
 	case *hir.UpCastExprHir:
-		return e.emitForUpCastExprHir(exprHir.(*hir.UpCastExprHir))
+		return e.emitForUpCastExprHir(exprHir)
 	case *hir.DownCastExprHir:
-		return e.emitForDownCastExprHir(exprHir.(*hir.DownCastExprHir))
+		return e.emitForDownCastExprHir(exprHir)
 	case *hir.AssignExprHir:
-		return e.emitForAssignExprHir(exprHir.(*hir.AssignExprHir))
+		return e.emitForAssignExprHir(exprHir)
 	case *hir.PrefixExprHir:
-		return e.emitForPrefixExprHir(exprHir.(*hir.PrefixExprHir))
+		return e.emitForPrefixExprHir(exprHir)
 	case *hir.PostfixExprHir:
-		return e.emitForPostfixExprHir(exprHir.(*hir.PostfixExprHir))
+		return e.emitForPostfixExprHir(exprHir)
 	case *hir.TypeInstantiationExprHir:
-		return e.emitForTypeInstantiationExprHir(exprHir.(*hir.TypeInstantiationExprHir), llvm.Value{})
+		return e.emitForTypeInstantiationExprHir(exprHir, llvm.Value{})
 	case *hir.MemberAccessExprHir:
-		return e.emitForMemberAccessExprHir(exprHir.(*hir.MemberAccessExprHir), 0)
+		return e.emitForMemberAccessExprHir(exprHir, 0)
 	case *hir.ArraySubscriptExprHir:
-		return e.emitForArraySubscriptExprHir(exprHir.(*hir.ArraySubscriptExprHir), 0)
+		return e.emitForArraySubscriptExprHir(exprHir, 0)
 	case *hir.BinaryExprHir:
-		return e.emitForBinExprHir(exprHir.(*hir.BinaryExprHir))
+		return e.emitForBinExprHir(exprHir)
 	case *hir.ArrayExprHir:
-		return e.emitForArrayExprHir(exprHir.(*hir.ArrayExprHir), llvm.Value{})
+		return e.emitForArrayExprHir(exprHir, llvm.Value{})
 	case *hir.IdentExprHir:
-		return e.emitForIdentExprHir(exprHir.(*hir.IdentExprHir))
+		return e.emitForIdentExprHir(exprHir)
 	case *hir.ArgIdentExprHir:
-		return e.emitForArgIdentExprHir(exprHir.(*hir.ArgIdentExprHir))
+		return e.emitForArgIdentExprHir(exprHir)
 	case *hir.IntExprHir:
-		return e.emitForIntExprHir(exprHir.(*hir.IntExprHir))
+		return e.emitForIntExprHir(exprHir)
 	case *hir.FloatExprHir:
-		return e.emitForFloatExprHir(exprHir.(*hir.FloatExprHir))
+		return e.emitForFloatExprHir(exprHir)
 	case *hir.CallExprHir:
-		return e.emitForCallExprHir(exprHir.(*hir.CallExprHir))
+		return e.emitForCallExprHir(exprHir)
 	case *hir.BoolExprHir:
-		return e.emitForBoolExprHir(exprHir.(*hir.BoolExprHir))
+		return e.emitForBoolExprHir(exprHir)
 	default:
 		panic("not implemented")
 	}
@@ -575,19 +575,19 @@ func (e *Emitter) getPtrToMemberAccessExprHir(memberAccessExprHir *hir.MemberAcc
 }
 
 func (e *Emitter) getPtrToLvalueExprHirValue(lvalueExprHir hir.LvalueExprHir) llvm.Value {
-	switch lvalueExprHir.(type) {
+	switch lvalueExprHir := lvalueExprHir.(type) {
 	case *hir.IdentExprHir:
-		identExprHir := lvalueExprHir.(*hir.IdentExprHir)
+		identExprHir := lvalueExprHir
 		identValue := e.variablesMap[identExprHir.Name]
 		return identValue
 	case *hir.MemberAccessExprHir:
-		memberExprHir := lvalueExprHir.(*hir.MemberAccessExprHir)
+		memberExprHir := lvalueExprHir
 		return e.getPtrToMemberAccessExprHir(memberExprHir, 0)
 	case *hir.ArraySubscriptExprHir:
-		arraySubscriptExprHir := lvalueExprHir.(*hir.ArraySubscriptExprHir)
+		arraySubscriptExprHir := lvalueExprHir
 		itemPtr := e.getPtrToLvalueExprHirValue(arraySubscriptExprHir.Left.(hir.LvalueExprHir))
 		indexValue := e.emitForExprHir(arraySubscriptExprHir.Index)
-		
+
 		llvmItemType := e.getLlvmTypeForType(arraySubscriptExprHir.Type)
 		return e.builder.CreateInBoundsGEP(
 			llvmItemType,
@@ -596,7 +596,7 @@ func (e *Emitter) getPtrToLvalueExprHirValue(lvalueExprHir hir.LvalueExprHir) ll
 			"arraygeptmp",
 		)
 	case *hir.PrefixExprHir:
-		prefixExprHir := lvalueExprHir.(*hir.PrefixExprHir)
+		prefixExprHir := lvalueExprHir
 		// assuming that prefix expression is always * operator
 		ptrPtrValue := e.getPtrToLvalueExprHirValue(prefixExprHir.Expr.(hir.LvalueExprHir))
 		return e.builder.CreateLoad(
