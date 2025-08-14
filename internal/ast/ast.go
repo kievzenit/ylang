@@ -36,6 +36,7 @@ type ControlFlowStmt interface {
 type Expr interface {
 	AstNode
 	ExprNode()
+	IsConst() bool
 }
 
 type UnaryExpr interface {

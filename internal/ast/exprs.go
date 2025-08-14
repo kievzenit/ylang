@@ -206,6 +206,24 @@ func (PrefixExpr) ExprNode()            {}
 func (PostfixExpr) ExprNode()           {}
 func (BinaryExpr) ExprNode()            {}
 
+func (BoolExpr) IsConst() bool                { return true }
+func (IntExpr) IsConst() bool                 { return true }
+func (FloatExpr) IsConst() bool               { return true }
+func (CharExpr) IsConst() bool                { return true }
+func (StringExpr) IsConst() bool              { return true }
+func (IdentExpr) IsConst() bool               { return false }
+func (AssignExpr) IsConst() bool              { return false }
+func (e ArrayExpr) IsConst() bool             { return false }
+func (CallExpr) IsConst() bool                { return false }
+func (e TypeInstantiationExpr) IsConst() bool { return false }
+func (TypeConstructionExpr) IsConst() bool    { return false }
+func (ArraySubscriptExpr) IsConst() bool      { return false }
+func (MemberAccessExpr) IsConst() bool        { return false }
+func (e CastExpr) IsConst() bool              { return e.Left.IsConst() }
+func (e PrefixExpr) IsConst() bool            { return e.Right.IsConst() }
+func (e PostfixExpr) IsConst() bool           { return e.Left.IsConst() }
+func (e BinaryExpr) IsConst() bool            { return e.Left.IsConst() && e.Right.IsConst() }
+
 func (PrefixExpr) UnaryExprNode()  {}
 func (PostfixExpr) UnaryExprNode() {}
 
