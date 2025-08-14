@@ -12,10 +12,11 @@ import (
 type Emitter struct {
 	fileHir *hir.FileHir
 
-	typesMap         map[string]llvm.Type
-	variablesMap     map[string]llvm.Value
-	funcsMap         map[string]llvm.Value
-	initFunctionsMap map[string]llvm.Value
+	typesMap           map[string]llvm.Type
+	variablesMap       map[string]llvm.Value
+	globalVariablesMap map[string]llvm.Value
+	funcsMap           map[string]llvm.Value
+	initFunctionsMap   map[string]llvm.Value
 
 	context llvm.Context
 	module  llvm.Module
@@ -37,10 +38,11 @@ func NewEmitter(fileHir *hir.FileHir) *Emitter {
 	return &Emitter{
 		fileHir: fileHir,
 
-		typesMap:         make(map[string]llvm.Type),
-		variablesMap:     make(map[string]llvm.Value),
-		funcsMap:         make(map[string]llvm.Value),
-		initFunctionsMap: make(map[string]llvm.Value),
+		typesMap:           make(map[string]llvm.Type),
+		variablesMap:       make(map[string]llvm.Value),
+		globalVariablesMap: make(map[string]llvm.Value),
+		funcsMap:           make(map[string]llvm.Value),
+		initFunctionsMap:   make(map[string]llvm.Value),
 
 		context: context,
 		module:  context.NewModule("main"),
@@ -56,7 +58,13 @@ func (e *Emitter) Emit() llvm.Module {
 	e.declareTypes()
 	e.declareFuncPrototypes()
 
-	e.emitForFileHir(e.fileHir)
+	for _, globalVarDecl := range e.fileHir.GlobalVarDecls {
+		e.emitForGlobalVarDeclStmtHir(globalVarDecl)
+	}
+
+	for _, funcDecl := range e.fileHir.FuncDecls {
+		e.emitForFuncDeclStmtHir(funcDecl)
+	}
 
 	return e.module
 }
@@ -172,21 +180,6 @@ func (e *Emitter) declareFuncPrototypes() {
 	}
 }
 
-func (e *Emitter) emitForFileHir(fileHir *hir.FileHir) {
-	for _, topStmtHir := range fileHir.Stmts {
-		e.emitForTopStmtHir(topStmtHir)
-	}
-}
-
-func (e *Emitter) emitForTopStmtHir(topStmtHir hir.TopStmtHir) {
-	switch topStmtHir.(type) {
-	case *hir.FuncDeclStmtHir:
-		e.emitForFuncDeclStmtHir(topStmtHir.(*hir.FuncDeclStmtHir))
-	default:
-		panic("not implemented")
-	}
-}
-
 func (e *Emitter) emitForFuncDeclStmtHir(funcDeclStmtHir *hir.FuncDeclStmtHir) {
 	if funcDeclStmtHir.Body == nil {
 		return
@@ -253,6 +246,14 @@ func (e *Emitter) emitForScopeStmtHir(scopeStmtHir *hir.ScopeStmtHir) {
 	for _, stmtHir := range scopeStmtHir.Stmts {
 		e.emitForStmtHir(stmtHir)
 	}
+}
+
+func (e *Emitter) emitForGlobalVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
+	globalVarValue := llvm.AddGlobal(e.module, e.getLlvmTypeForType(varDeclStmtHir.Type), varDeclStmtHir.Name)
+	e.globalVariablesMap[varDeclStmtHir.Name] = globalVarValue
+
+	exprValue := e.emitForExprHir(varDeclStmtHir.Value)
+	globalVarValue.SetInitializer(exprValue)
 }
 
 func (e *Emitter) emitForVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
@@ -1284,7 +1285,10 @@ func (e *Emitter) emitForArgIdentExprHir(argIdentExprHir *hir.ArgIdentExprHir) l
 
 func (e *Emitter) emitForIdentExprHir(identExprHir *hir.IdentExprHir) llvm.Value {
 	identType := e.getLlvmTypeForType(identExprHir.ExprType())
-	identValue := e.variablesMap[identExprHir.Name]
+	identValue, ok := e.variablesMap[identExprHir.Name]
+	if !ok {
+		identValue = e.globalVariablesMap[identExprHir.Name]
+	}
 	return e.builder.CreateLoad(identType, identValue, "loadtmp")
 }
 
