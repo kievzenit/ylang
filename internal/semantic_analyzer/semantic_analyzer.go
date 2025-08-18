@@ -1026,9 +1026,10 @@ func (sa *SemanticAnalyzer) analyzeVarDeclStmt(varDeclStmt *ast.VarDeclStmt, isG
 	})
 
 	return &hir.VarDeclStmtHir{
-		Type:  valueExpr.ExprType(),
-		Name:  varDeclStmt.Name,
-		Value: valueExpr,
+		Type:   valueExpr.ExprType(),
+		Static: varDeclStmt.Static,
+		Name:   varDeclStmt.Name,
+		Value:  valueExpr,
 	}
 }
 

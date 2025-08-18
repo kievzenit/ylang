@@ -26,8 +26,9 @@ type FuncDeclStmtHir struct {
 
 type VarDeclStmtHir struct {
 	types.Type
-	Name  string
-	Value ExprHir
+	Static bool
+	Name   string
+	Value  ExprHir
 }
 
 type IfStmtHir struct {
