@@ -257,6 +257,15 @@ func (e *Emitter) emitForGlobalVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir
 }
 
 func (e *Emitter) emitForVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
+	if varDeclStmtHir.Static {
+		e.emitForStaticVarDeclStmtHir(varDeclStmtHir)
+		return
+	}
+
+	e.emitForLocalVarDeclStmtHir(varDeclStmtHir)
+}
+
+func (e *Emitter) emitForLocalVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
 	currBasicBlock := e.builder.GetInsertBlock()
 	e.builder.SetInsertPointAtEnd(e.currentAllocBasicBlock)
 	allocValue := e.builder.CreateAlloca(
@@ -266,15 +275,92 @@ func (e *Emitter) emitForVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
 	e.variablesMap[varDeclStmtHir.Name] = allocValue
 	e.builder.SetInsertPointAtEnd(currBasicBlock)
 
-	if typeInstantiationExprHir, ok := varDeclStmtHir.Value.(*hir.TypeInstantiationExprHir); ok {
+	e.emitForVarDeclStmtExprHir(varDeclStmtHir.Value, allocValue)
+}
+
+func (e *Emitter) emitForStaticVarDeclStmtHir(varDeclStmtHir *hir.VarDeclStmtHir) {
+	globalType := e.getLlvmTypeForType(varDeclStmtHir.Value.ExprType())
+	globalValue := llvm.AddGlobal(
+		e.module,
+		globalType,
+		fmt.Sprintf("%s::%s", e.currentFunc.Name(), varDeclStmtHir.Name),
+	)
+	globalValue.SetLinkage(llvm.InternalLinkage)
+	globalValue.SetInitializer(llvm.ConstNull(globalType))
+
+	guardType := e.context.Int32Type()
+	guardValue := llvm.AddGlobal(
+		e.module,
+		guardType,
+		fmt.Sprintf("guard for %s::%s", e.currentFunc.Name(), varDeclStmtHir.Name),
+	)
+	guardValue.SetLinkage(llvm.InternalLinkage)
+	guardValue.SetInitializer(llvm.ConstInt(guardType, 0, false))
+
+	e.variablesMap[varDeclStmtHir.Name] = globalValue
+
+	checkBlock := llvm.AddBasicBlock(e.currentFunc, "static_init_check")
+	tryInitBlock := llvm.AddBasicBlock(e.currentFunc, "static_init_try_init")
+	initBlock := llvm.AddBasicBlock(e.currentFunc, "static_init_init")
+	spinLockBlock := llvm.AddBasicBlock(e.currentFunc, "static_init_spin_lock")
+	doneBlock := llvm.AddBasicBlock(e.currentFunc, "static_init_done")
+
+	checkBlock.MoveBefore(e.nextBasicBlock)
+	tryInitBlock.MoveBefore(e.nextBasicBlock)
+	initBlock.MoveBefore(e.nextBasicBlock)
+	spinLockBlock.MoveBefore(e.nextBasicBlock)
+	doneBlock.MoveBefore(e.nextBasicBlock)
+
+	e.builder.CreateBr(checkBlock)
+
+	e.builder.SetInsertPointAtEnd(checkBlock)
+	checkGuardValue := e.builder.CreateLoad(guardType, guardValue, "guard_value")
+	guardValue.SetOrdering(llvm.AtomicOrderingAcquire)
+	guardSwitch := e.builder.CreateSwitch(
+		checkGuardValue,
+		doneBlock,
+		2,
+	)
+	guardSwitch.AddCase(llvm.ConstInt(guardType, 0, false), tryInitBlock)
+	guardSwitch.AddCase(llvm.ConstInt(guardType, 1, false), spinLockBlock)
+
+	e.builder.SetInsertPointAtEnd(tryInitBlock)
+	checkGuardValue = e.builder.CreateAtomicCmpXchg(
+		guardValue,
+		llvm.ConstInt(guardType, 0, false),
+		llvm.ConstInt(guardType, 1, false),
+		llvm.AtomicOrderingAcquireRelease,
+		llvm.AtomicOrderingAcquire,
+		false,
+	)
+	guardSuccess := e.builder.CreateExtractValue(checkGuardValue, 1, "guard_success")
+	e.builder.CreateCondBr(guardSuccess, initBlock, spinLockBlock)
+
+	e.builder.SetInsertPointAtEnd(initBlock)
+	e.emitForVarDeclStmtExprHir(varDeclStmtHir.Value, globalValue)
+	guardStore := e.builder.CreateStore(llvm.ConstInt(guardType, 2, false), guardValue)
+	guardStore.SetOrdering(llvm.AtomicOrderingRelease)
+	e.builder.CreateBr(doneBlock)
+
+	e.builder.SetInsertPointAtEnd(spinLockBlock)
+	checkGuardValue = e.builder.CreateLoad(guardType, guardValue, "guard_value")
+	checkGuardValue.SetOrdering(llvm.AtomicOrderingAcquire)
+	guardCheck := e.builder.CreateICmp(llvm.IntEQ, checkGuardValue, llvm.ConstInt(guardType, 1, false), "guard_check")
+	e.builder.CreateCondBr(guardCheck, spinLockBlock, doneBlock)
+
+	e.builder.SetInsertPointAtEnd(doneBlock)
+}
+
+func (e *Emitter) emitForVarDeclStmtExprHir(varDeclStmtExprHir hir.ExprHir, allocValue llvm.Value) {
+	if typeInstantiationExprHir, ok := varDeclStmtExprHir.(*hir.TypeInstantiationExprHir); ok {
 		e.emitForTypeInstantiationExprHir(typeInstantiationExprHir, allocValue)
 		return
-	} else if arrayExprHir, ok := varDeclStmtHir.Value.(*hir.ArrayExprHir); ok {
+	} else if arrayExprHir, ok := varDeclStmtExprHir.(*hir.ArrayExprHir); ok {
 		e.emitForArrayExprHir(arrayExprHir, allocValue)
 		return
 	}
 
-	varValue := e.emitForExprHir(varDeclStmtHir.Value)
+	varValue := e.emitForExprHir(varDeclStmtExprHir)
 	e.builder.CreateStore(varValue, allocValue)
 }
 
