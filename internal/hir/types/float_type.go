@@ -31,8 +31,8 @@ func (f *FloatType) SetIsConst(isConst bool) {
 	f.Const = isConst
 }
 
-func (f *FloatType) GetMember(name string) (Type, bool) {
-	return nil, false
+func (f *FloatType) GetMember(name string) (MemberEntry, bool) {
+	return MemberEntry{}, false
 }
 
 func (f *FloatType) CanBeImplicitlyCastedTo(t Type) bool {

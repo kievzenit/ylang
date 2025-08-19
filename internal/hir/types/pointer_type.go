@@ -29,8 +29,8 @@ func (t *PointerType) SetIsConst(isConst bool) {
 	t.Const = isConst
 }
 
-func (t *PointerType) GetMember(name string) (Type, bool) {
-	return nil, false
+func (t *PointerType) GetMember(name string) (MemberEntry, bool) {
+	return MemberEntry{}, false
 }
 
 func (t *PointerType) CanBeImplicitlyCastedTo(_ Type) bool {

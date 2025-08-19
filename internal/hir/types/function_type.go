@@ -44,8 +44,8 @@ func (*FunctionType) SetIsConst(bool) {
 	panic("cannot set is const for a function type")
 }
 
-func (*FunctionType) GetMember(name string) (Type, bool) {
-	return nil, false
+func (*FunctionType) GetMember(name string) (MemberEntry, bool) {
+	return MemberEntry{}, false
 }
 
 func (*FunctionType) CanBeImplicitlyCastedTo(t Type) bool {

@@ -1,10 +1,28 @@
 package hir_types
 
+type AccessModifier int
+
+const (
+	AccessModifierPublic AccessModifier = iota
+	AccessModifierPrivate
+)
+
+type MemberEntry struct {
+	MemberType Type
+	ParentType Type
+	AccessModifier
+}
+
+type FunctionEntry struct {
+	*FunctionType
+	AccessModifier
+}
+
 type UserType struct {
 	Name            string
-	Members         map[string]Type
+	Members         map[string]MemberEntry
 	MemberPositions map[string]int
-	MemberFunctions map[string]*FunctionType
+	MemberFunctions map[string]FunctionEntry
 	Const           bool
 }
 
@@ -24,8 +42,10 @@ func (t *UserType) SameAs(other Type) bool {
 		if len(t.Members) != len(userType.Members) {
 			return false
 		}
-		for name, member := range t.Members {
-			if otherMember, exists := userType.Members[name]; !exists || !member.SameAs(otherMember) {
+		for name, memberEntry := range t.Members {
+			if otherMemberEntry, exists := userType.Members[name]; !exists ||
+				(!memberEntry.MemberType.SameAs(otherMemberEntry.MemberType) &&
+					memberEntry.AccessModifier != otherMemberEntry.AccessModifier) {
 				return false
 			}
 		}
@@ -42,7 +62,7 @@ func (t *UserType) SetIsConst(isConst bool) {
 	t.Const = isConst
 }
 
-func (t *UserType) GetMember(name string) (Type, bool) {
+func (t *UserType) GetMember(name string) (MemberEntry, bool) {
 	member, ok := t.Members[name]
 	return member, ok
 }

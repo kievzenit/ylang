@@ -28,8 +28,8 @@ func (b *BoolType) SetIsConst(isConst bool) {
 	b.Const = isConst
 }
 
-func (*BoolType) GetMember(name string) (Type, bool) {
-	return nil, false
+func (*BoolType) GetMember(name string) (MemberEntry, bool) {
+	return MemberEntry{}, false
 }
 
 func (*BoolType) CanBeImplicitlyCastedTo(t Type) bool {

@@ -21,8 +21,8 @@ func (*VoidType) SetIsConst(bool) {
 	panic("cannot set is const of a void type")
 }
 
-func (*VoidType) GetMember(name string) (Type, bool) {
-	return nil, false
+func (*VoidType) GetMember(name string) (MemberEntry, bool) {
+	return MemberEntry{}, false
 }
 
 func (*VoidType) CanBeImplicitlyCastedTo(t Type) bool {

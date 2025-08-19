@@ -20,7 +20,7 @@ func (a *ArrayType) SameAs(t Type) bool {
 	if arrayType, ok := t.(*ArrayType); ok {
 		return a.Size == arrayType.Size && a.ItemType.SameAs(arrayType.ItemType)
 	}
-	
+
 	return false
 }
 
@@ -32,11 +32,15 @@ func (a *ArrayType) SetIsConst(isConst bool) {
 	a.Const = isConst
 }
 
-func (a *ArrayType) GetMember(name string) (Type, bool) {
+func (a *ArrayType) GetMember(name string) (MemberEntry, bool) {
 	if name == "length" {
-		return &IntType{Signed: true, Bits: 32}, true
+		return MemberEntry{
+			MemberType:     &IntType{Signed: true, Bits: 32},
+			ParentType:     a,
+			AccessModifier: AccessModifierPublic,
+		}, true
 	}
-	return nil, false
+	return MemberEntry{}, false
 }
 
 func (a *ArrayType) CanBeImplicitlyCastedTo(t Type) bool {

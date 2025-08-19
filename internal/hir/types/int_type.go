@@ -35,8 +35,8 @@ func (i *IntType) SetIsConst(isConst bool) {
 	i.Const = isConst
 }
 
-func (*IntType) GetMember(name string) (Type, bool) {
-	return nil, false
+func (*IntType) GetMember(name string) (MemberEntry, bool) {
+	return MemberEntry{}, false
 }
 
 func (i *IntType) CanBeImplicitlyCastedTo(t Type) bool {
