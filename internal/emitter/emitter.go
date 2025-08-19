@@ -633,15 +633,27 @@ func (e *Emitter) getPtrToMemberAccessExprHir(memberAccessExprHir *hir.MemberAcc
 	var leftValue llvm.Value
 	if leftIdentExprHir, ok := memberAccessExprHir.Left.(*hir.IdentExprHir); ok {
 		leftValue = e.variablesMap[leftIdentExprHir.Name]
+	} else if leftIdentExprHir, ok := memberAccessExprHir.Left.(*hir.ArgIdentExprHir); ok {
+		leftValue = e.emitForArgIdentExprHir(leftIdentExprHir)	
 	} else if leftMemberExprHir, ok := memberAccessExprHir.Left.(*hir.MemberAccessExprHir); ok {
 		leftValue = e.getPtrToMemberAccessExprHir(leftMemberExprHir, depth+1)
 	} else {
 		panic("unreachable")
 	}
 
-	leftMemberType, ok := memberAccessExprHir.Left.ExprType().(*hir_types.UserType)
-	if !ok {
-		panic("member access should be user type")
+	var leftMemberType *hir_types.UserType
+
+	switch memberType := memberAccessExprHir.Left.ExprType().(type) {
+	case *hir_types.UserType:
+		leftMemberType = memberType
+	case *hir_types.PointerType:
+		userType, ok := memberType.InnerType.(*hir_types.UserType)
+		if !ok {
+			panic("member access should be on pointer to user type")
+		}
+		leftMemberType = userType
+	default:
+		panic("member access should be directly on user type or on pointer to user type")
 	}
 
 	rightIdentExprHir, ok := memberAccessExprHir.Right.(*hir.IdentExprHir)
