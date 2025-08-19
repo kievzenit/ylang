@@ -85,6 +85,8 @@ type SemanticAnalyzer struct {
 	forwardTypeDeclarations  map[string]*ast.TypeDeclStmt
 	currentlyProcessingTypes map[string]struct{}
 
+	currentlyInType *types.UserType
+
 	typeResolver *TypeResolver
 
 	funcsMap map[string]*types.FunctionType
@@ -286,11 +288,29 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 	}
 
 	sa.currentlyProcessingTypes[typeDeclStmt.Name] = struct{}{}
-	members := make(map[string]types.Type)
+	members := make(map[string]types.MemberEntry)
 	memberPositions := make(map[string]int)
+
+	userType := &types.UserType{
+		Name:            typeDeclStmt.Name,
+		Members:         members,
+		MemberPositions: memberPositions,
+		MemberFunctions: make(map[string]types.FunctionEntry),
+	}
 
 	for position, member := range typeDeclStmt.Members {
 		memberType, ok := sa.typeResolver.GetType(member.Type)
+
+		var accessModifier types.AccessModifier
+		switch member.AccessModifier.Kind {
+		case lexer.PUBLIC:
+			accessModifier = types.AccessModifierPublic
+		case lexer.PRIVATE:
+			accessModifier = types.AccessModifierPrivate
+		default:
+			panic("unknown access modifier")
+		}
+
 		switch {
 		case ok && memberType.SameAs(sa.typeResolver.VoidType()):
 			sa.eh.AddError(
@@ -303,7 +323,11 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 			)
 			continue
 		case ok && !memberType.SameAs(sa.typeResolver.VoidType()):
-			members[member.Name] = memberType
+			members[member.Name] = types.MemberEntry{
+				MemberType:     memberType,
+				ParentType:     userType,
+				AccessModifier: accessModifier,
+			}
 			memberPositions[member.Name] = position
 			continue
 		}
@@ -337,16 +361,14 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 		}
 
 		memberType = sa.analyzeTypeDeclStmt(memberTypeDeclStmt)
-		members[member.Name] = memberType
+		members[member.Name] = types.MemberEntry{
+			MemberType:     memberType,
+			ParentType:     userType,
+			AccessModifier: accessModifier,
+		}
 		memberPositions[member.Name] = position
 	}
 
-	userType := &types.UserType{
-		Name:            typeDeclStmt.Name,
-		Members:         members,
-		MemberPositions: memberPositions,
-		MemberFunctions: make(map[string]*types.FunctionType),
-	}
 	sa.typeResolver.AddUserType(userType.Name, userType)
 	delete(sa.currentlyProcessingTypes, typeDeclStmt.Name)
 	return userType
@@ -408,10 +430,24 @@ func (sa *SemanticAnalyzer) declareMemberFunctions(
 		}
 
 		funcType, ok := sa.checkFunc(function.FuncDeclStmt)
+
+		var accessModifier types.AccessModifier
+		switch function.AccessModifier.Kind {
+		case lexer.PUBLIC:
+			accessModifier = types.AccessModifierPublic
+		case lexer.PRIVATE:
+			accessModifier = types.AccessModifierPrivate
+		default:
+			panic("unknown access modifier")
+		}
+
 		if ok {
 			memberFuncName := fmt.Sprintf("%s::%s", userType.Name, function.FuncDeclStmt.Name)
 			sa.funcsMap[memberFuncName] = funcType
-			userType.MemberFunctions[function.FuncDeclStmt.Name] = funcType
+			userType.MemberFunctions[function.FuncDeclStmt.Name] = types.FunctionEntry{
+				FunctionType:   funcType,
+				AccessModifier: accessModifier,
+			}
 		}
 	}
 }
@@ -432,6 +468,7 @@ func (sa *SemanticAnalyzer) analyzeMemberFunctions() []*hir.FuncDeclStmtHir {
 	memberFuncsHir := make([]*hir.FuncDeclStmtHir, 0)
 
 	for _, typeDeclStmt := range sa.forwardTypeDeclarations {
+		sa.currentlyInType, _ = sa.typeResolver.GetUserType(typeDeclStmt.Name)
 		for _, function := range typeDeclStmt.Funcs {
 			memberFuncDeclStmtHir := sa.analyzeFuncDeclStmt(function.FuncDeclStmt, typeDeclStmt.Name)
 			if memberFuncDeclStmtHir == nil {
@@ -440,6 +477,7 @@ func (sa *SemanticAnalyzer) analyzeMemberFunctions() []*hir.FuncDeclStmtHir {
 			memberFuncDeclStmtHir.Name = fmt.Sprintf("%s::%s", typeDeclStmt.Name, memberFuncDeclStmtHir.Name)
 			memberFuncsHir = append(memberFuncsHir, memberFuncDeclStmtHir)
 		}
+		sa.currentlyInType = nil
 	}
 
 	return memberFuncsHir
@@ -1510,7 +1548,7 @@ func (sa *SemanticAnalyzer) analyzeTypeInstantiationExpr(typeInstantiationExpr *
 	membersSet := make(map[string]struct{})
 	failed := false
 	for _, instantiation := range typeInstantiationExpr.Instantiations {
-		memberType, exists := userType.Members[instantiation.Name]
+		memberEntry, exists := userType.Members[instantiation.Name]
 		if !exists {
 			sa.eh.AddError(
 				newSemanticError(
@@ -1530,8 +1568,8 @@ func (sa *SemanticAnalyzer) analyzeTypeInstantiationExpr(typeInstantiationExpr *
 			continue
 		}
 
-		instantiationExpr = sa.tryImplicitCast(instantiationExpr, memberType)
-		if !memberType.SameAs(instantiationExpr.ExprType()) {
+		instantiationExpr = sa.tryImplicitCast(instantiationExpr, memberEntry.MemberType)
+		if !memberEntry.MemberType.SameAs(instantiationExpr.ExprType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					fmt.Sprintf("member %s type mismatch", instantiation.Name),
@@ -1587,10 +1625,10 @@ func (sa *SemanticAnalyzer) analyzeMemberAccessExpr(memberAccessExpr *ast.Member
 	switch memberAccessExpr.Right.(type) {
 	case *ast.IdentExpr:
 		right := memberAccessExpr.Right.(*ast.IdentExpr)
-		memberType, ok := left.ExprType().GetMember(right.Value)
+		memberEntry, ok := left.ExprType().GetMember(right.Value)
 		if !ok {
 			if leftPtrType, isPtr := left.ExprType().(*types.PointerType); isPtr {
-				memberType, ok = leftPtrType.InnerType.GetMember(right.Value)
+				memberEntry, ok = leftPtrType.InnerType.GetMember(right.Value)
 			}
 
 			if !ok {
@@ -1606,11 +1644,25 @@ func (sa *SemanticAnalyzer) analyzeMemberAccessExpr(memberAccessExpr *ast.Member
 			}
 		}
 
+		if memberEntry.AccessModifier != types.AccessModifierPublic {
+			if sa.currentlyInType == nil || !sa.currentlyInType.SameAs(memberEntry.ParentType) {
+				sa.eh.AddError(
+					newSemanticError(
+						fmt.Sprintf("member %s is not accessible", right.Value),
+						memberAccessExpr.StartToken.Metadata.FileName,
+						memberAccessExpr.StartToken.Metadata.Line,
+						memberAccessExpr.StartToken.Metadata.Column,
+					),
+				)
+				return nil
+			}
+		}
+
 		return &hir.MemberAccessExprHir{
-			Type: memberType,
+			Type: memberEntry.MemberType,
 			Left: left,
 			Right: &hir.IdentExprHir{
-				Type: memberType,
+				Type: memberEntry.MemberType,
 				Name: right.Value,
 			},
 		}
