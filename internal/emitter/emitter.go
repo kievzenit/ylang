@@ -137,14 +137,14 @@ func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
 	customStruct := e.context.StructCreateNamed(userType.Name)
 	fieldTypes := make([]llvm.Type, len(userType.Members))
 	for memberName, pos := range userType.MemberPositions {
-		memberType := userType.Members[memberName]
-		llvmTypeAlreadyExists := e.llvmTypeExistsForType(memberType)
+		memberEntry := userType.Members[memberName]
+		llvmTypeAlreadyExists := e.llvmTypeExistsForType(memberEntry.MemberType)
 		if llvmTypeAlreadyExists {
-			fieldTypes[pos] = e.getLlvmTypeForType(memberType)
+			fieldTypes[pos] = e.getLlvmTypeForType(memberEntry.MemberType)
 			continue
 		}
 
-		innerUserType, ok := memberType.(*hir_types.UserType)
+		innerUserType, ok := memberEntry.MemberType.(*hir_types.UserType)
 		if !ok {
 			panic("type should be either builtin or user type, this was not")
 		}
