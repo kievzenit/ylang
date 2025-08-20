@@ -98,28 +98,16 @@ func (l *Lexer) Tokenize() []*Token {
 				l.line++
 				l.col = 0
 			}
-			break
-
 		case l.isCurrDigit():
 			tokens = append(tokens, l.processNumber())
-			break
-
 		case l.isCurrIdentifier():
 			tokens = append(tokens, l.processIdentifier())
-			break
-
 		case l.read() == '\'':
 			tokens = append(tokens, l.processCharLiteral())
-			break
-
 		case l.read() == '"':
 			tokens = append(tokens, l.processStringLiteral())
-			break
-
 		case l.isCurrPunctuation():
 			tokens = append(tokens, l.processPunctuation())
-			break
-
 		default:
 			l.eh.AddError(l.newUnexpectedError(l.read()))
 			l.eh.FailNow()
@@ -159,11 +147,7 @@ func (l *Lexer) isCurrPunctuation() bool {
 }
 
 func (l *Lexer) isCurrNewline() bool {
-	if l.read() == '\n' {
-		return true
-	}
-
-	return false
+	return l.read() == '\n'
 }
 
 func (l *Lexer) isCurrSkippable() bool {
