@@ -1,0 +1,5 @@
+Build failed with errors:
+
+ERROR: type Node is recursively defined (Node -> Node)
+---> golden/err_self_by_value.y:3:1
+

@@ -1,0 +1,5 @@
+Build failed with errors:
+
+ERROR: argument type Missing not defined
+---> golden/err_undefined_arg_type.y:3:1
+

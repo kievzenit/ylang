@@ -9,7 +9,7 @@ func (*BoolType) Type() string {
 }
 
 func (t *BoolType) SameAs(other Type) bool {
-	if t.IsConst() != t.IsConst() {
+	if t.IsConst() != other.IsConst() {
 		return false
 	}
 

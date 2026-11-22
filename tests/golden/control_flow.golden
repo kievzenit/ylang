@@ -1,0 +1,90 @@
+; ModuleID = 'main'
+source_filename = "main"
+
+define i32 @main() #0 {
+alloc:
+  %sum = alloca i32, align 4
+  %i = alloca i32, align 4
+  %n = alloca i32, align 4
+  br label %entry
+
+entry:                                            ; preds = %alloc
+  store i32 0, ptr %sum, align 4
+  br label %forinit
+
+forinit:                                          ; preds = %entry
+  store i32 0, ptr %i, align 4
+  br label %forcheck
+
+forcheck:                                         ; preds = %forpost, %forinit
+  %loadtmp = load i32, ptr %i, align 4
+  %lttmp = icmp slt i32 %loadtmp, 10
+  br i1 %lttmp, label %forbody, label %forafter
+
+forbody:                                          ; preds = %forcheck
+  br label %ifcheck
+
+ifcheck:                                          ; preds = %forbody
+  %loadtmp1 = load i32, ptr %i, align 4
+  %eqtmp = icmp eq i32 %loadtmp1, 3
+  br i1 %eqtmp, label %ifbody, label %ifelse
+
+ifbody:                                           ; preds = %ifcheck
+  br label %forpost
+
+ifelse:                                           ; preds = %ifcheck
+  br label %ifcheck2
+
+ifcheck2:                                         ; preds = %ifelse
+  %loadtmp6 = load i32, ptr %i, align 4
+  %gttmp = icmp sgt i32 %loadtmp6, 7
+  br i1 %gttmp, label %ifbody3, label %ifelse4
+
+ifbody3:                                          ; preds = %ifcheck2
+  br label %forafter
+
+ifelse4:                                          ; preds = %ifcheck2
+  br label %ifafter5
+
+ifafter5:                                         ; preds = %ifelse4
+  br label %ifafter
+
+ifafter:                                          ; preds = %ifafter5
+  %loadtmp7 = load i32, ptr %sum, align 4
+  %loadtmp8 = load i32, ptr %i, align 4
+  %addtmp = add i32 %loadtmp7, %loadtmp8
+  store i32 %addtmp, ptr %sum, align 4
+  br label %forpost
+
+forpost:                                          ; preds = %ifafter, %ifbody
+  %loadtmp9 = load i32, ptr %i, align 4
+  %unaryinctmp = add nsw i32 %loadtmp9, 1
+  store i32 %unaryinctmp, ptr %i, align 4
+  br label %forcheck
+
+forafter:                                         ; preds = %ifbody3, %forcheck
+  store i32 0, ptr %n, align 4
+  br label %whilecheck
+
+whilecheck:                                       ; preds = %whilebody, %forafter
+  %loadtmp10 = load i32, ptr %n, align 4
+  %lttmp11 = icmp slt i32 %loadtmp10, 5
+  br i1 %lttmp11, label %whilebody, label %whileafter
+
+whilebody:                                        ; preds = %whilecheck
+  %loadtmp12 = load i32, ptr %n, align 4
+  %unaryinctmp13 = add nsw i32 %loadtmp12, 1
+  store i32 %unaryinctmp13, ptr %n, align 4
+  br label %whilecheck
+
+whileafter:                                       ; preds = %whilecheck
+  %loadtmp14 = load i32, ptr %sum, align 4
+  %loadtmp15 = load i32, ptr %n, align 4
+  %addtmp16 = add i32 %loadtmp14, %loadtmp15
+  ret i32 %addtmp16
+
+unreachable:                                      ; No predecessors!
+  unreachable
+}
+
+attributes #0 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protector-buffer-size"="8" }

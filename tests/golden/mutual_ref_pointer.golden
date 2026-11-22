@@ -1,0 +1,37 @@
+; ModuleID = 'main'
+source_filename = "main"
+
+%Child = type { ptr, i32 }
+%Parent = type { ptr, i32 }
+
+define i32 @grandparent_id(ptr %0) #0 {
+alloc:
+  br label %entry
+
+entry:                                            ; preds = %alloc
+  %"Child::parent" = getelementptr inbounds nuw %Child, ptr %0, i32 0, i32 0
+  %memberaccesstmp = load ptr, ptr %"Child::parent", align 8
+  %"Parent::child" = getelementptr inbounds nuw %Parent, ptr %memberaccesstmp, i32 0, i32 0
+  %memberaccesstmp1 = load ptr, ptr %"Parent::child", align 8
+  %"Child::parent2" = getelementptr inbounds nuw %Child, ptr %memberaccesstmp1, i32 0, i32 0
+  %memberaccesstmp3 = load ptr, ptr %"Child::parent2", align 8
+  %"Parent::id" = getelementptr inbounds nuw %Parent, ptr %memberaccesstmp3, i32 0, i32 1
+  %memberaccesstmp4 = load i32, ptr %"Parent::id", align 4
+  ret i32 %memberaccesstmp4
+
+unreachable:                                      ; No predecessors!
+  unreachable
+}
+
+define i32 @main() #0 {
+alloc:
+  br label %entry
+
+entry:                                            ; preds = %alloc
+  ret i32 0
+
+unreachable:                                      ; No predecessors!
+  unreachable
+}
+
+attributes #0 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protector-buffer-size"="8" }

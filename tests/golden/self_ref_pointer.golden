@@ -1,0 +1,53 @@
+; ModuleID = 'main'
+source_filename = "main"
+
+%Node = type { i32, ptr }
+
+define i32 @third_value(ptr %0) #0 {
+alloc:
+  br label %entry
+
+entry:                                            ; preds = %alloc
+  %"Node::next" = getelementptr inbounds nuw %Node, ptr %0, i32 0, i32 1
+  %memberaccesstmp = load ptr, ptr %"Node::next", align 8
+  %"Node::next1" = getelementptr inbounds nuw %Node, ptr %memberaccesstmp, i32 0, i32 1
+  %memberaccesstmp2 = load ptr, ptr %"Node::next1", align 8
+  %"Node::value" = getelementptr inbounds nuw %Node, ptr %memberaccesstmp2, i32 0, i32 0
+  %memberaccesstmp3 = load i32, ptr %"Node::value", align 4
+  ret i32 %memberaccesstmp3
+
+unreachable:                                      ; No predecessors!
+  unreachable
+}
+
+define i32 @relink(ptr %0, ptr %1) #0 {
+alloc:
+  br label %entry
+
+entry:                                            ; preds = %alloc
+  %"Node::next" = getelementptr inbounds nuw %Node, ptr %0, i32 0, i32 1
+  store ptr %1, ptr %"Node::next", align 8
+  %"Node::next1" = getelementptr inbounds nuw %Node, ptr %0, i32 0, i32 1
+  %memberaccesstmp = load ptr, ptr %"Node::next1", align 8
+  %"Node::value" = getelementptr inbounds nuw %Node, ptr %memberaccesstmp, i32 0, i32 0
+  store i32 42, ptr %"Node::value", align 4
+  %"Node::value2" = getelementptr inbounds nuw %Node, ptr %1, i32 0, i32 0
+  %memberaccesstmp3 = load i32, ptr %"Node::value2", align 4
+  ret i32 %memberaccesstmp3
+
+unreachable:                                      ; No predecessors!
+  unreachable
+}
+
+define i32 @main() #0 {
+alloc:
+  br label %entry
+
+entry:                                            ; preds = %alloc
+  ret i32 0
+
+unreachable:                                      ; No predecessors!
+  unreachable
+}
+
+attributes #0 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protector-buffer-size"="8" }

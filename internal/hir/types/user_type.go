@@ -30,28 +30,16 @@ func (t *UserType) Type() string {
 	return t.Name
 }
 
+// SameAs compares user types nominally. Each declared type has exactly one
+// UserType instance, so comparing names is enough. Comparing members
+// structurally would recurse forever on self-referential types (next *Node).
 func (t *UserType) SameAs(other Type) bool {
 	if t.IsConst() != other.IsConst() {
 		return false
 	}
 
-	if userType, ok := other.(*UserType); ok {
-		if t.Name != userType.Name {
-			return false
-		}
-		if len(t.Members) != len(userType.Members) {
-			return false
-		}
-		for name, memberEntry := range t.Members {
-			if otherMemberEntry, exists := userType.Members[name]; !exists ||
-				(!memberEntry.MemberType.SameAs(otherMemberEntry.MemberType) &&
-					memberEntry.AccessModifier != otherMemberEntry.AccessModifier) {
-				return false
-			}
-		}
-		return true
-	}
-	return false
+	userType, ok := other.(*UserType)
+	return ok && t.Name == userType.Name
 }
 
 func (t *UserType) IsConst() bool {

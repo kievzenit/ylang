@@ -1,0 +1,5 @@
+Build failed with errors:
+
+ERROR: type *Missing not defined
+---> golden/err_undefined_member_type.y:3:1
+

@@ -2,6 +2,7 @@ package semantic_analyzer
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/kievzenit/ylang/internal/ast"
 	"github.com/kievzenit/ylang/internal/compiler_errors"
@@ -82,14 +83,18 @@ type SemanticAnalyzer struct {
 	funcArgs    map[string]argDefinition
 	funcRetType types.Type
 
-	forwardTypeDeclarations  map[string]*ast.TypeDeclStmt
-	currentlyProcessingTypes map[string]struct{}
+	forwardTypeDeclarations map[string]*ast.TypeDeclStmt
+	// typeDecls holds type declarations in source order, so that analysis
+	// (and therefore error and output order) is deterministic.
+	typeDecls []*ast.TypeDeclStmt
 
 	currentlyInType *types.UserType
 
 	typeResolver *TypeResolver
 
 	funcsMap map[string]*types.FunctionType
+	// funcNames holds keys of funcsMap in declaration order.
+	funcNames []string
 
 	loopDepth int
 }
@@ -120,9 +125,15 @@ func NewSemanticAnalyzer(
 
 		typeResolver: NewTypeResolver(),
 
-		forwardTypeDeclarations:  make(map[string]*ast.TypeDeclStmt),
-		currentlyProcessingTypes: make(map[string]struct{}),
+		forwardTypeDeclarations: make(map[string]*ast.TypeDeclStmt),
 	}
+}
+
+func (sa *SemanticAnalyzer) declareFunc(name string, funcType *types.FunctionType) {
+	if _, exists := sa.funcsMap[name]; !exists {
+		sa.funcNames = append(sa.funcNames, name)
+	}
+	sa.funcsMap[name] = funcType
 }
 
 func (sa *SemanticAnalyzer) enterScope() {
@@ -143,9 +154,9 @@ func (sa *SemanticAnalyzer) Analyze() *hir.FileHir {
 	memberFuncs := sa.analyzeMemberFunctions()
 	funcs = append(funcs, memberFuncs...)
 
-	funcTypes := make([]*types.FunctionType, 0)
-	for _, funcType := range sa.funcsMap {
-		funcTypes = append(funcTypes, funcType)
+	funcTypes := make([]*types.FunctionType, 0, len(sa.funcNames))
+	for _, name := range sa.funcNames {
+		funcTypes = append(funcTypes, sa.funcsMap[name])
 	}
 
 	return &hir.FileHir{
@@ -193,16 +204,112 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForTypeDeclStmts() {
 		}
 
 		sa.forwardTypeDeclarations[typeDeclStmt.Name] = typeDeclStmt
+		sa.typeDecls = append(sa.typeDecls, typeDeclStmt)
 	}
 
-	userTypes := make([]*types.UserType, 0)
-	for _, typeDeclStmt := range sa.forwardTypeDeclarations {
-		userType := sa.analyzeTypeDeclStmt(typeDeclStmt)
-		userTypes = append(userTypes, userType)
+	// Phase 1: register an empty shell for every type, so that member types
+	// can refer to any type, including the one being declared (e.g. `next *Node`).
+	for _, typeDeclStmt := range sa.typeDecls {
+		sa.typeResolver.AddUserType(typeDeclStmt.Name, &types.UserType{
+			Name:            typeDeclStmt.Name,
+			Members:         make(map[string]types.MemberEntry),
+			MemberPositions: make(map[string]int),
+			MemberFunctions: make(map[string]types.FunctionEntry),
+		})
 	}
 
-	for _, userType := range userTypes {
-		sa.declareMemberFunctions(sa.forwardTypeDeclarations[userType.Name], userType)
+	// Phase 2: fill in members.
+	for _, typeDeclStmt := range sa.typeDecls {
+		sa.analyzeTypeDeclStmt(typeDeclStmt)
+	}
+
+	// Phase 3: a type must not contain itself by value (pointers are fine).
+	sa.checkRecursiveTypes()
+
+	for _, typeDeclStmt := range sa.typeDecls {
+		userType, _ := sa.typeResolver.GetUserType(typeDeclStmt.Name)
+		sa.declareMemberFunctions(typeDeclStmt, userType)
+	}
+}
+
+// checkRecursiveTypes reports every type that contains itself by value,
+// directly or through other types or arrays. Such a type would have infinite size.
+func (sa *SemanticAnalyzer) checkRecursiveTypes() {
+	const (
+		unvisited = iota
+		inProgress
+		done
+	)
+	state := make(map[*types.UserType]int)
+	reported := make(map[*types.UserType]bool)
+	path := make([]*types.UserType, 0)
+
+	var visit func(t *types.UserType)
+	var visitType func(t types.Type)
+
+	visitType = func(t types.Type) {
+		switch t := t.(type) {
+		case *types.UserType:
+			visit(t)
+		case *types.ArrayType:
+			visitType(t.ItemType)
+		}
+		// Pointers (and everything else) do not embed storage of the pointee.
+	}
+
+	visit = func(t *types.UserType) {
+		switch state[t] {
+		case done:
+			return
+		case inProgress:
+			start := 0
+			for i, p := range path {
+				if p == t {
+					start = i
+					break
+				}
+			}
+			cycle := path[start:]
+			names := make([]string, 0, len(cycle)+1)
+			for _, p := range cycle {
+				names = append(names, p.Name)
+			}
+			names = append(names, t.Name)
+			for _, p := range cycle {
+				if reported[p] {
+					continue
+				}
+				reported[p] = true
+				typeDeclStmt := sa.forwardTypeDeclarations[p.Name]
+				sa.eh.AddError(
+					newSemanticError(
+						fmt.Sprintf("type %s is recursively defined (%s)", p.Name, strings.Join(names, " -> ")),
+						typeDeclStmt.StartToken.Metadata.FileName,
+						typeDeclStmt.StartToken.Metadata.Line,
+						typeDeclStmt.StartToken.Metadata.Column,
+					),
+				)
+			}
+			return
+		}
+
+		state[t] = inProgress
+		path = append(path, t)
+
+		typeDeclStmt := sa.forwardTypeDeclarations[t.Name]
+		for _, member := range typeDeclStmt.Members {
+			if memberEntry, ok := t.Members[member.Name]; ok {
+				visitType(memberEntry.MemberType)
+			}
+		}
+
+		path = path[:len(path)-1]
+		state[t] = done
+	}
+
+	for _, typeDeclStmt := range sa.typeDecls {
+		userType, _ := sa.typeResolver.GetUserType(typeDeclStmt.Name)
+		visit(userType)
 	}
 }
 
@@ -216,7 +323,7 @@ func (sa *SemanticAnalyzer) scanTranslationUnitForFuncDeclStmts() {
 		funcType, ok := sa.checkFunc(funcDeclStmt)
 
 		if ok {
-			sa.funcsMap[funcDeclStmt.Name] = funcType
+			sa.declareFunc(funcDeclStmt.Name, funcType)
 		}
 	}
 }
@@ -243,13 +350,14 @@ func (sa *SemanticAnalyzer) checkFunc(funcDeclStmt *ast.FuncDeclStmt) (*types.Fu
 		if !ok {
 			sa.eh.AddError(
 				newSemanticError(
-					fmt.Sprintf("argument type %s not defined", arg.Type),
+					fmt.Sprintf("argument type %s not defined", arg.Type.TypeName()),
 					funcDeclStmt.StartToken.Metadata.FileName,
 					funcDeclStmt.StartToken.Metadata.Line,
 					funcDeclStmt.StartToken.Metadata.Column,
 				),
 			)
 			failed = true
+			continue
 		}
 
 		if argType.SameAs(sa.typeResolver.VoidType()) {
@@ -282,25 +390,18 @@ func (sa *SemanticAnalyzer) checkFunc(funcDeclStmt *ast.FuncDeclStmt) (*types.Fu
 	}, true
 }
 
+// analyzeTypeDeclStmt fills in the members of the type shell that was
+// registered for typeDeclStmt in scanTranslationUnitForTypeDeclStmts.
+// Every user type name is already resolvable at this point, so members may
+// refer to any type in any order. Infinite-size (by-value recursive) types
+// are rejected separately by checkRecursiveTypes.
 func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) *types.UserType {
-	if userType, ok := sa.typeResolver.GetUserType(typeDeclStmt.Name); ok {
-		return userType
-	}
-
-	sa.currentlyProcessingTypes[typeDeclStmt.Name] = struct{}{}
-	members := make(map[string]types.MemberEntry)
-	memberPositions := make(map[string]int)
-
-	userType := &types.UserType{
-		Name:            typeDeclStmt.Name,
-		Members:         members,
-		MemberPositions: memberPositions,
-		MemberFunctions: make(map[string]types.FunctionEntry),
+	userType, ok := sa.typeResolver.GetUserType(typeDeclStmt.Name)
+	if !ok {
+		panic("type shell must be registered before analyzing its members: " + typeDeclStmt.Name)
 	}
 
 	for position, member := range typeDeclStmt.Members {
-		memberType, ok := sa.typeResolver.GetType(member.Type)
-
 		var accessModifier types.AccessModifier
 		switch member.AccessModifier.Kind {
 		case lexer.PUBLIC:
@@ -311,8 +412,20 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 			panic("unknown access modifier")
 		}
 
-		switch {
-		case ok && memberType.SameAs(sa.typeResolver.VoidType()):
+		memberType, ok := sa.typeResolver.GetType(member.Type)
+		if !ok {
+			sa.eh.AddError(
+				newSemanticError(
+					fmt.Sprintf("type %s not defined", member.Type.TypeName()),
+					typeDeclStmt.StartToken.Metadata.FileName,
+					typeDeclStmt.StartToken.Metadata.Line,
+					typeDeclStmt.StartToken.Metadata.Column,
+				),
+			)
+			continue
+		}
+
+		if memberType.SameAs(sa.typeResolver.VoidType()) {
 			sa.eh.AddError(
 				newSemanticError(
 					"member cannot be of type void",
@@ -322,55 +435,16 @@ func (sa *SemanticAnalyzer) analyzeTypeDeclStmt(typeDeclStmt *ast.TypeDeclStmt) 
 				),
 			)
 			continue
-		case ok && !memberType.SameAs(sa.typeResolver.VoidType()):
-			members[member.Name] = types.MemberEntry{
-				MemberType:     memberType,
-				ParentType:     userType,
-				AccessModifier: accessModifier,
-			}
-			memberPositions[member.Name] = position
-			continue
 		}
 
-		memberTypeDeclStmt, ok := sa.forwardTypeDeclarations[member.Type.TypeName()]
-		if !ok {
-			sa.eh.AddError(
-				newSemanticError(
-					fmt.Sprintf("type %s not defined", member.Type),
-					typeDeclStmt.StartToken.Metadata.FileName,
-					typeDeclStmt.StartToken.Metadata.Line,
-					typeDeclStmt.StartToken.Metadata.Column,
-				),
-			)
-			continue
-		}
-
-		if _, ok := sa.currentlyProcessingTypes[member.Type.TypeName()]; ok {
-			for typeName := range sa.currentlyProcessingTypes {
-				typeDeclStmt := sa.forwardTypeDeclarations[typeName]
-				sa.eh.AddError(
-					newSemanticError(
-						fmt.Sprintf("type %s is recursively defined", typeDeclStmt.Name),
-						typeDeclStmt.StartToken.Metadata.FileName,
-						typeDeclStmt.StartToken.Metadata.Line,
-						typeDeclStmt.StartToken.Metadata.Column,
-					),
-				)
-			}
-			continue
-		}
-
-		memberType = sa.analyzeTypeDeclStmt(memberTypeDeclStmt)
-		members[member.Name] = types.MemberEntry{
+		userType.Members[member.Name] = types.MemberEntry{
 			MemberType:     memberType,
 			ParentType:     userType,
 			AccessModifier: accessModifier,
 		}
-		memberPositions[member.Name] = position
+		userType.MemberPositions[member.Name] = position
 	}
 
-	sa.typeResolver.AddUserType(userType.Name, userType)
-	delete(sa.currentlyProcessingTypes, typeDeclStmt.Name)
 	return userType
 }
 
@@ -443,7 +517,7 @@ func (sa *SemanticAnalyzer) declareMemberFunctions(
 
 		if ok {
 			memberFuncName := fmt.Sprintf("%s::%s", userType.Name, function.FuncDeclStmt.Name)
-			sa.funcsMap[memberFuncName] = funcType
+			sa.declareFunc(memberFuncName, funcType)
 			userType.MemberFunctions[function.FuncDeclStmt.Name] = types.FunctionEntry{
 				FunctionType:   funcType,
 				AccessModifier: accessModifier,
@@ -467,7 +541,7 @@ func (sa *SemanticAnalyzer) analyzeGlobalVars() []*hir.VarDeclStmtHir {
 func (sa *SemanticAnalyzer) analyzeMemberFunctions() []*hir.FuncDeclStmtHir {
 	memberFuncsHir := make([]*hir.FuncDeclStmtHir, 0)
 
-	for _, typeDeclStmt := range sa.forwardTypeDeclarations {
+	for _, typeDeclStmt := range sa.typeDecls {
 		sa.currentlyInType, _ = sa.typeResolver.GetUserType(typeDeclStmt.Name)
 		for _, function := range typeDeclStmt.Funcs {
 			memberFuncDeclStmtHir := sa.analyzeFuncDeclStmt(function.FuncDeclStmt, typeDeclStmt.Name)
@@ -488,7 +562,9 @@ func (sa *SemanticAnalyzer) analyzeFunctions() []*hir.FuncDeclStmtHir {
 
 	for _, stmt := range sa.translationUnit.Stmts {
 		if funcDeclStmt, ok := stmt.(*ast.FuncDeclStmt); ok {
-			funcsHir = append(funcsHir, sa.analyzeFuncDeclStmt(funcDeclStmt, ""))
+			if funcDeclHir := sa.analyzeFuncDeclStmt(funcDeclStmt, ""); funcDeclHir != nil {
+				funcsHir = append(funcsHir, funcDeclHir)
+			}
 		}
 	}
 
@@ -502,6 +578,11 @@ func (sa *SemanticAnalyzer) analyzeFuncDeclStmt(funcDeclStmt *ast.FuncDeclStmt, 
 	fullFuncName := funcDeclStmt.Name
 	if typeName != "" {
 		fullFuncName = fmt.Sprintf("%s::%s", typeName, funcDeclStmt.Name)
+	}
+
+	if _, declared := sa.funcsMap[fullFuncName]; !declared {
+		// The signature failed to check; its errors are already reported.
+		return nil
 	}
 
 	if funcDeclStmt.Extern {

@@ -1,5 +1,16 @@
+LLVM_CONFIG ?= llvm-config-21
+LLVM_TAG ?= llvm21
+
+LLVM_INCDIR := $(shell $(LLVM_CONFIG) --includedir)
+LLVM_LIBDIR := $(shell $(LLVM_CONFIG) --libdir)
+LLVM_LIBNAME := $(shell $(LLVM_CONFIG) --libnames | sed -e 's/^lib//' -e 's/\.so$$//' -e 's/\.a$$//')
+
+export CGO_CFLAGS := -I$(LLVM_INCDIR)
+export CGO_CXXFLAGS := -I$(LLVM_INCDIR) -std=c++17
+export CGO_LDFLAGS := -L$(LLVM_LIBDIR) -l$(LLVM_LIBNAME)
+
 build:
-	go run cmd/main.go .sources/test.y 2> .out/test.ll
+	go run -tags $(LLVM_TAG) cmd/main.go .sources/test.y 2> .out/test.ll
 	clang -c -o .out/test.o .out/test.ll
 
 build-c: build
@@ -17,3 +28,9 @@ inspect: build
 
 inspect-c: build-c
 	llvm-objdump -d -M intel .out/test | less
+
+test:
+	go test -tags $(LLVM_TAG) ./...
+
+test-update:
+	go test -tags $(LLVM_TAG) ./tests -update

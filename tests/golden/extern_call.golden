@@ -1,0 +1,18 @@
+; ModuleID = 'main'
+source_filename = "main"
+
+declare i32 @abs(i32) #0
+
+define i32 @main() #0 {
+alloc:
+  br label %entry
+
+entry:                                            ; preds = %alloc
+  %0 = call i32 @abs(i32 -5)
+  ret i32 %0
+
+unreachable:                                      ; No predecessors!
+  unreachable
+}
+
+attributes #0 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protector-buffer-size"="8" }

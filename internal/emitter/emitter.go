@@ -3,6 +3,7 @@ package emitter
 import (
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/kievzenit/ylang/internal/hir"
 	hir_types "github.com/kievzenit/ylang/internal/hir/types"
@@ -69,22 +70,6 @@ func (e *Emitter) Emit() llvm.Module {
 	return e.module
 }
 
-func (e *Emitter) llvmTypeExistsForType(hirType hir_types.Type) bool {
-	if ptrType, ok := hirType.(*hir_types.PointerType); ok {
-		return e.llvmTypeExistsForType(ptrType.InnerType)
-	}
-
-	if arrayType, ok := hirType.(*hir_types.ArrayType); ok {
-		return e.llvmTypeExistsForType(arrayType.ItemType)
-	}
-
-	if _, ok := e.typesMap[hirType.Type()]; ok {
-		return true
-	}
-
-	return false
-}
-
 func (e *Emitter) getLlvmTypeForType(hirType hir_types.Type) llvm.Type {
 	if ptrType, ok := hirType.(*hir_types.PointerType); ok {
 		return llvm.PointerType(e.getLlvmTypeForType(ptrType.InnerType), 0)
@@ -124,36 +109,33 @@ func (e *Emitter) declareTypes() {
 
 	e.typesMap["void"] = e.context.VoidType()
 
-	for _, userType := range e.fileHir.Types {
-		e.emitForType(userType)
+	// Sorted for deterministic output.
+	typeNames := make([]string, 0, len(e.fileHir.Types))
+	for name := range e.fileHir.Types {
+		typeNames = append(typeNames, name)
+	}
+	sort.Strings(typeNames)
+
+	// Phase 1: create every named struct as opaque, so member types can refer
+	// to any struct, including their own (e.g. `next *Node`).
+	for _, name := range typeNames {
+		e.typesMap[name] = e.context.StructCreateNamed(name)
+	}
+
+	// Phase 2: set struct bodies. The analyzer has already rejected types
+	// that contain themselves by value.
+	for _, name := range typeNames {
+		e.emitForType(e.fileHir.Types[name])
 	}
 }
 
 func (e *Emitter) emitForType(userType *hir_types.UserType) llvm.Type {
-	if llvmType, ok := e.typesMap[userType.Name]; ok {
-		return llvmType
-	}
-
-	customStruct := e.context.StructCreateNamed(userType.Name)
+	customStruct := e.typesMap[userType.Name]
 	fieldTypes := make([]llvm.Type, len(userType.Members))
 	for memberName, pos := range userType.MemberPositions {
-		memberEntry := userType.Members[memberName]
-		llvmTypeAlreadyExists := e.llvmTypeExistsForType(memberEntry.MemberType)
-		if llvmTypeAlreadyExists {
-			fieldTypes[pos] = e.getLlvmTypeForType(memberEntry.MemberType)
-			continue
-		}
-
-		innerUserType, ok := memberEntry.MemberType.(*hir_types.UserType)
-		if !ok {
-			panic("type should be either builtin or user type, this was not")
-		}
-
-		innerStruct := e.emitForType(innerUserType)
-		fieldTypes[pos] = innerStruct
+		fieldTypes[pos] = e.getLlvmTypeForType(userType.Members[memberName].MemberType)
 	}
 	customStruct.StructSetBody(fieldTypes, false)
-	e.typesMap[userType.Name] = customStruct
 
 	return customStruct
 }
@@ -605,7 +587,7 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 	case *hir.TypeInstantiationExprHir:
 		return e.emitForTypeInstantiationExprHir(exprHir, llvm.Value{})
 	case *hir.MemberAccessExprHir:
-		return e.emitForMemberAccessExprHir(exprHir, 0)
+		return e.emitForMemberAccessExprHir(exprHir)
 	case *hir.ArraySubscriptExprHir:
 		return e.emitForArraySubscriptExprHir(exprHir, 0)
 	case *hir.BinaryExprHir:
@@ -629,47 +611,74 @@ func (e *Emitter) emitForExprHir(exprHir hir.ExprHir) llvm.Value {
 	}
 }
 
-func (e *Emitter) getPtrToMemberAccessExprHir(memberAccessExprHir *hir.MemberAccessExprHir, depth int) llvm.Value {
-	var leftValue llvm.Value
-	if leftIdentExprHir, ok := memberAccessExprHir.Left.(*hir.IdentExprHir); ok {
-		leftValue = e.variablesMap[leftIdentExprHir.Name]
-	} else if leftIdentExprHir, ok := memberAccessExprHir.Left.(*hir.ArgIdentExprHir); ok {
-		leftValue = e.emitForArgIdentExprHir(leftIdentExprHir)	
-	} else if leftMemberExprHir, ok := memberAccessExprHir.Left.(*hir.MemberAccessExprHir); ok {
-		leftValue = e.getPtrToMemberAccessExprHir(leftMemberExprHir, depth+1)
-	} else {
-		panic("unreachable")
+func (e *Emitter) getPtrToMemberAccessExprHir(memberAccessExprHir *hir.MemberAccessExprHir) llvm.Value {
+	memberPtr, ok := e.getMemberAddress(memberAccessExprHir)
+	if !ok {
+		panic("cannot take the address of a member of a temporary value")
 	}
+	return memberPtr
+}
 
-	var leftMemberType *hir_types.UserType
+// memberAccessBase evaluates the left side of a member access. If the struct
+// lives in memory, it returns the struct's address and isAddress == true. If
+// the struct exists only as a value (a call result, a by-value argument), it
+// returns that struct value and isAddress == false.
+//
+// When the left side is a pointer, the struct address is the pointer's value,
+// e.g. for `n.next.value` the base of `.value` is the loaded `n.next`.
+func (e *Emitter) memberAccessBase(
+	memberAccessExprHir *hir.MemberAccessExprHir,
+) (userType *hir_types.UserType, base llvm.Value, isAddress bool) {
+	left := memberAccessExprHir.Left
 
-	switch memberType := memberAccessExprHir.Left.ExprType().(type) {
-	case *hir_types.UserType:
-		leftMemberType = memberType
+	switch leftType := left.ExprType().(type) {
 	case *hir_types.PointerType:
-		userType, ok := memberType.InnerType.(*hir_types.UserType)
+		userType, ok := leftType.InnerType.(*hir_types.UserType)
 		if !ok {
 			panic("member access should be on pointer to user type")
 		}
-		leftMemberType = userType
+		return userType, e.emitForExprHir(left), true
+	case *hir_types.UserType:
+		switch left := left.(type) {
+		case *hir.IdentExprHir:
+			if variable, ok := e.variablesMap[left.Name]; ok {
+				return leftType, variable, true
+			}
+			return leftType, e.globalVariablesMap[left.Name], true
+		case *hir.MemberAccessExprHir:
+			if memberPtr, ok := e.getMemberAddress(left); ok {
+				return leftType, memberPtr, true
+			}
+		}
+		return leftType, e.emitForExprHir(left), false
 	default:
 		panic("member access should be directly on user type or on pointer to user type")
 	}
+}
 
+func memberName(memberAccessExprHir *hir.MemberAccessExprHir) string {
 	rightIdentExprHir, ok := memberAccessExprHir.Right.(*hir.IdentExprHir)
 	if !ok {
-		panic("unreachable")
+		panic("not implemented")
+	}
+	return rightIdentExprHir.Name
+}
+
+// getMemberAddress returns the address of the accessed member, or false if
+// the struct it belongs to has no address.
+func (e *Emitter) getMemberAddress(memberAccessExprHir *hir.MemberAccessExprHir) (llvm.Value, bool) {
+	userType, base, isAddress := e.memberAccessBase(memberAccessExprHir)
+	if !isAddress {
+		return llvm.Value{}, false
 	}
 
-	memberPosition := leftMemberType.MemberPositions[rightIdentExprHir.Name]
-	memberGep := e.builder.CreateStructGEP(
-		e.getLlvmTypeForType(leftMemberType),
-		leftValue,
-		memberPosition,
-		fmt.Sprintf("%s::%s", leftMemberType.Name, rightIdentExprHir.Name),
-	)
-
-	return memberGep
+	name := memberName(memberAccessExprHir)
+	return e.builder.CreateStructGEP(
+		e.getLlvmTypeForType(userType),
+		base,
+		userType.MemberPositions[name],
+		fmt.Sprintf("%s::%s", userType.Name, name),
+	), true
 }
 
 func (e *Emitter) getPtrToLvalueExprHirValue(lvalueExprHir hir.LvalueExprHir) llvm.Value {
@@ -680,7 +689,7 @@ func (e *Emitter) getPtrToLvalueExprHirValue(lvalueExprHir hir.LvalueExprHir) ll
 		return identValue
 	case *hir.MemberAccessExprHir:
 		memberExprHir := lvalueExprHir
-		return e.getPtrToMemberAccessExprHir(memberExprHir, 0)
+		return e.getPtrToMemberAccessExprHir(memberExprHir)
 	case *hir.ArraySubscriptExprHir:
 		arraySubscriptExprHir := lvalueExprHir
 		itemPtr := e.getPtrToLvalueExprHirValue(arraySubscriptExprHir.Left.(hir.LvalueExprHir))
@@ -1008,45 +1017,27 @@ func (e *Emitter) emitForTypeInstantiationExprHir(typeInstantiationExprHir *hir.
 	return ptrToStruct
 }
 
-func (e *Emitter) emitForMemberAccessExprHir(memberAccessExprHir *hir.MemberAccessExprHir, depth int) llvm.Value {
-	var leftValue llvm.Value
-	if leftIdentExprHir, ok := memberAccessExprHir.Left.(*hir.IdentExprHir); ok {
-		leftValue = e.variablesMap[leftIdentExprHir.Name]
-	} else if leftMemberExprHir, ok := memberAccessExprHir.Left.(*hir.MemberAccessExprHir); ok {
-		leftValue = e.emitForMemberAccessExprHir(leftMemberExprHir, depth+1)
-	} else {
-		leftValue = e.emitForExprHir(memberAccessExprHir.Left)
+func (e *Emitter) emitForMemberAccessExprHir(memberAccessExprHir *hir.MemberAccessExprHir) llvm.Value {
+	userType, base, isAddress := e.memberAccessBase(memberAccessExprHir)
+	name := memberName(memberAccessExprHir)
+	position := userType.MemberPositions[name]
+
+	if !isAddress {
+		// used with bar().member access
+		return e.builder.CreateExtractValue(base, position, "memberaccesstmp")
 	}
 
-	leftMemberType, ok := memberAccessExprHir.Left.ExprType().(*hir_types.UserType)
-	if !ok {
-		panic("member access should be user type")
-	}
-
-	rightIdentExprHir, ok := memberAccessExprHir.Right.(*hir.IdentExprHir)
-	if !ok {
-		panic("not implemented")
-	}
-
-	memberPosition := leftMemberType.MemberPositions[rightIdentExprHir.Name]
-	// used with bar().member access
-	if leftValue.Type().TypeKind() == llvm.StructTypeKind {
-		return e.builder.CreateExtractValue(leftValue, memberPosition, "memberaccesstmp")
-	}
-
-	memberGep := e.builder.CreateStructGEP(
-		e.getLlvmTypeForType(leftMemberType),
-		leftValue,
-		memberPosition,
-		fmt.Sprintf("%s::%s", leftMemberType.Name, rightIdentExprHir.Name),
+	memberPtr := e.builder.CreateStructGEP(
+		e.getLlvmTypeForType(userType),
+		base,
+		position,
+		fmt.Sprintf("%s::%s", userType.Name, name),
 	)
-	memberAccessExprType := e.getLlvmTypeForType(memberAccessExprHir.Type)
-
-	if depth == 0 {
-		return e.builder.CreateLoad(memberAccessExprType, memberGep, "memberaccesstmp")
-	}
-
-	return memberGep
+	return e.builder.CreateLoad(
+		e.getLlvmTypeForType(memberAccessExprHir.Type),
+		memberPtr,
+		"memberaccesstmp",
+	)
 }
 
 func (e *Emitter) emitForArraySubscriptExprHir(arraySubscriptExprHir *hir.ArraySubscriptExprHir, depth int) llvm.Value {

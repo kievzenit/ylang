@@ -1,0 +1,5 @@
+Build failed with errors:
+
+ERROR: type Tree is recursively defined (Tree -> Tree)
+---> golden/err_array_by_value.y:3:85
+

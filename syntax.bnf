@@ -57,10 +57,11 @@
 <breakall_statement> ::= "brekall" ";"
 <return_statement> ::= "return" <expression>? ";"
 
-<local_statement> ::= <variable_declaration_statement> | <expression_statement>
+<local_statement> ::= <variable_declaration_statement> | <type_first_variable_declaration_statement> | <expression_statement>
 
 <expression_statement> ::= <expression> ";"
 <variable_declaration_statement> ::= "static"? ("let" | "const") <identifier_literal> (":" <type_identifier>)? "=" <expression> ";"
+<type_first_variable_declaration_statement> ::= <type_identifier> <identifier_literal> "=" <expression> ";"
 
 <expression> ::= <unary_expression>
     | <binary_expression>

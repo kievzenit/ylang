@@ -1,0 +1,8 @@
+Build failed with errors:
+
+ERROR: type A is recursively defined (A -> B -> A)
+---> golden/err_mutual_by_value.y:3:1
+
+ERROR: type B is recursively defined (A -> B -> A)
+---> golden/err_mutual_by_value.y:8:1
+

@@ -23,12 +23,21 @@ type ErrorHandler interface {
 type CompilerErrorHandler struct {
 	errors []CompilerError
 	writer io.Writer
+	exit   func()
 }
 
 func NewErrorHandler(outputWriter io.Writer) ErrorHandler {
+	return NewErrorHandlerWithExit(outputWriter, func() { os.Exit(1) })
+}
+
+// NewErrorHandlerWithExit is like NewErrorHandler, but FailNow calls exit
+// instead of terminating the process. exit must not return normally (for
+// example it can panic), because callers of FailNow assume it does not return.
+func NewErrorHandlerWithExit(outputWriter io.Writer, exit func()) ErrorHandler {
 	return &CompilerErrorHandler{
 		errors: make([]CompilerError, 0),
 		writer: outputWriter,
+		exit:   exit,
 	}
 }
 
@@ -46,7 +55,8 @@ func (eh *CompilerErrorHandler) FailNow() {
 		fmt.Fprintln(eh.writer)
 	}
 
-	os.Exit(1)
+	eh.exit()
+	panic("ErrorHandler exit function returned")
 }
 
 func (eh *CompilerErrorHandler) FailIfAnyError() {

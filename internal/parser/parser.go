@@ -496,13 +496,109 @@ func (p *Parser) parseLocalStmt(expectSemicolon bool) ast.Stmt {
 		startToken := p.curr
 		p.read()
 		return p.parseVarDeclStmt(true, startToken, expectSemicolon)
-	case lexer.CONST:
-		return p.parseVarDeclStmt(false, nil, expectSemicolon)
 	case lexer.LET:
 		return p.parseVarDeclStmt(false, nil, expectSemicolon)
+	case lexer.CONST, lexer.IDENT, lexer.LBRACKET, lexer.ASTERISK:
+		if p.isTypeFirstVarDeclStmt() {
+			return p.parseTypeFirstVarDeclStmt(expectSemicolon)
+		}
+		if p.curr.Kind == lexer.CONST {
+			return p.parseVarDeclStmt(false, nil, expectSemicolon)
+		}
 	}
 
 	return p.parseExprStmt(expectSemicolon)
+}
+
+// isTypeFirstVarDeclStmt performs a bounded lookahead, without consuming any
+// tokens, to check whether the upcoming tokens form a
+// <type_identifier> <identifier_literal> "=" <expression> ";" construct,
+// as opposed to e.g. a plain expression statement or a "const"-keyword
+// variable declaration.
+func (p *Parser) isTypeFirstVarDeclStmt() bool {
+	count := 0
+	advance := func() {
+		count++
+		p.read()
+	}
+	defer func() {
+		for i := 0; i < count; i++ {
+			p.unread()
+		}
+	}()
+
+	if !p.matchTypeIdentifierTokens(advance) {
+		return false
+	}
+
+	if p.curr.Kind != lexer.IDENT {
+		return false
+	}
+	advance()
+
+	return p.curr.Kind == lexer.ASSIGN
+}
+
+func (p *Parser) matchTypeIdentifierTokens(advance func()) bool {
+	if p.curr.Kind == lexer.CONST {
+		advance()
+		return p.matchTypeIdentifierTokens(advance)
+	}
+
+	switch p.curr.Kind {
+	case lexer.IDENT:
+		advance()
+		return true
+	case lexer.LBRACKET:
+		advance()
+		if p.curr.Kind == lexer.RBRACKET {
+			advance()
+			return p.matchTypeIdentifierTokens(advance)
+		}
+		if p.curr.Kind != lexer.INT {
+			return false
+		}
+		advance()
+		if p.curr.Kind != lexer.RBRACKET {
+			return false
+		}
+		advance()
+		return p.matchTypeIdentifierTokens(advance)
+	case lexer.ASTERISK:
+		advance()
+		return p.matchTypeIdentifierTokens(advance)
+	default:
+		return false
+	}
+}
+
+func (p *Parser) parseTypeFirstVarDeclStmt(expectSemicolon bool) *ast.VarDeclStmt {
+	startToken := p.curr
+	explicitType := p.parseTypeIdentifier()
+
+	p.expect(lexer.IDENT)
+	varName := p.curr.Value
+	p.read()
+
+	p.expect(lexer.ASSIGN)
+	p.read()
+
+	expr := p.parseExpr()
+
+	if expectSemicolon {
+		p.expect(lexer.SEMICOLON)
+		p.read()
+	}
+
+	return &ast.VarDeclStmt{
+		StartToken: startToken,
+
+		Name:         varName,
+		ExplicitType: explicitType,
+		Value:        expr,
+		Static:       false,
+		Const:        false,
+	}
 }
 
 func (p *Parser) parseReturnStmt() *ast.ReturnStmt {

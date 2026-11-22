@@ -1,0 +1,5 @@
+Build failed with errors:
+
+ERROR: member count is not accessible
+---> golden/err_private_access.y:9:12
+

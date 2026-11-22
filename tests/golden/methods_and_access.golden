@@ -1,0 +1,30 @@
+; ModuleID = 'main'
+source_filename = "main"
+
+%Counter = type { i32 }
+
+define i32 @"Counter::get"(ptr %0) #0 {
+alloc:
+  br label %entry
+
+entry:                                            ; preds = %alloc
+  %"Counter::count" = getelementptr inbounds nuw %Counter, ptr %0, i32 0, i32 0
+  %memberaccesstmp = load i32, ptr %"Counter::count", align 4
+  ret i32 %memberaccesstmp
+
+unreachable:                                      ; No predecessors!
+  unreachable
+}
+
+define i32 @main() #0 {
+alloc:
+  br label %entry
+
+entry:                                            ; preds = %alloc
+  ret i32 0
+
+unreachable:                                      ; No predecessors!
+  unreachable
+}
+
+attributes #0 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protector-buffer-size"="8" }
